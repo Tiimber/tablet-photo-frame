@@ -767,7 +767,6 @@
         <option value="curtain">Curtain</option>
         <option value="rotate_fade">Rotate &amp; fade</option>
         <option value="flip_h">Flip</option>
-        <option value="blinds">Blinds</option>
         <option value="iris">Circle iris</option>
         <option value="diagonal_wipe">Diagonal wipe</option>
         <option value="clock_wipe">Clock wipe</option>
@@ -800,6 +799,14 @@
           <div class="sp-toggle-track"></div>
         </label>
       </div>
+    </div>
+    <div class="sp-row" id="sp-kbspeed-row">
+      <label>KB Speed</label>
+      <select id="sp-kbspeed">
+        <option value="normal">Normal</option>
+        <option value="slow">Slow</option>
+        <option value="slowest">Slowest</option>
+      </select>
     </div>
   </div>
   <div class="sp-actions">
@@ -1802,6 +1809,7 @@
   const spIntervalV  = document.getElementById('sp-interval-val')
   const spTransition = document.getElementById('sp-transition')
   const spKB         = document.getElementById('sp-kenburns')
+  const spKBSpeed    = document.getElementById('sp-kbspeed')
   const spOrder      = document.getElementById('sp-order')
   const spFit        = document.getElementById('sp-fit')
   const spSave       = document.getElementById('sp-save')
@@ -1823,6 +1831,7 @@
       spIntervalV.textContent = (cfg.interval || 10) + 's'
       spTransition.value = cfg.transition || 'crossfade'
       spKB.checked       = !!cfg.kenBurns
+      spKBSpeed.value    = cfg.kenBurnsSpeed || 'normal'
       spOrder.value      = cfg.order || 'random'
       spFit.value        = cfg.fit || 'cover'
       haUrl.value        = ha.url || ''
@@ -1836,11 +1845,12 @@
   spSave.addEventListener('click', async () => {
     spStatus.textContent = 'Saving…'
     const cfg = {
-      interval:   parseInt(spInterval.value),
-      transition: spTransition.value,
-      kenBurns:   spKB.checked,
-      order:      spOrder.value,
-      fit:        spFit.value,
+      interval:      parseInt(spInterval.value),
+      transition:    spTransition.value,
+      kenBurns:      spKB.checked,
+      kenBurnsSpeed: spKBSpeed.value,
+      order:         spOrder.value,
+      fit:           spFit.value,
     }
     try {
       await fetch('/api/config', {

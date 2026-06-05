@@ -62,7 +62,7 @@ const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic'])
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.webm', '.m4v'])
 const MEDIA_EXTS = new Set([...IMAGE_EXTS, ...VIDEO_EXTS])
 
-const DEFAULT_CONFIG = { interval: 10, transition: 'crossfade', kenBurns: false, order: 'random', fit: 'cover' }
+const DEFAULT_CONFIG = { interval: 10, transition: 'crossfade', kenBurns: false, kenBurnsSpeed: 'normal', order: 'random', fit: 'cover' }
 
 function loadConfig() {
   try { return { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) } }
@@ -346,11 +346,12 @@ function loadHASync() {
 }
 
 const HA_ENTITY_IDS = {
-  interval:   'input_number.slideshow_interval',
-  transition: 'input_select.slideshow_transition',
-  kenBurns:   'input_boolean.slideshow_ken_burns',
-  order:      'input_select.slideshow_order',
-  fit:        'input_select.slideshow_fit',
+  interval:      'input_number.slideshow_interval',
+  transition:    'input_select.slideshow_transition',
+  kenBurns:      'input_boolean.slideshow_ken_burns',
+  kenBurnsSpeed: 'input_select.slideshow_ken_burns_speed',
+  order:         'input_select.slideshow_order',
+  fit:           'input_select.slideshow_fit',
 }
 
 async function syncToHA(newCfg, oldCfg) {
@@ -382,6 +383,10 @@ async function syncToHA(newCfg, oldCfg) {
   if (oldCfg.fit !== newCfg.fit)
     calls.push(fetch(`${base}/api/services/input_select/select_option`, { method:'POST', headers,
       body: JSON.stringify({ entity_id: HA_ENTITY_IDS.fit, option: newCfg.fit }) }))
+
+  if (oldCfg.kenBurnsSpeed !== newCfg.kenBurnsSpeed)
+    calls.push(fetch(`${base}/api/services/input_select/select_option`, { method:'POST', headers,
+      body: JSON.stringify({ entity_id: HA_ENTITY_IDS.kenBurnsSpeed, option: newCfg.kenBurnsSpeed }) }))
 
   if (calls.length === 0) return
   try {

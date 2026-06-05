@@ -214,7 +214,6 @@
         <option value="curtain">Curtain</option>
         <option value="rotate_fade">Rotate &amp; fade</option>
         <option value="flip_h">Flip</option>
-        <option value="blinds">Blinds</option>
         <option value="iris">Circle iris</option>
         <option value="diagonal_wipe">Diagonal wipe</option>
         <option value="clock_wipe">Clock wipe</option>
@@ -230,6 +229,14 @@
         <input type="checkbox" id="s-kenburns">
         <div class="s-toggle-track"></div>
       </label>
+    </div>
+    <div class="s-row" id="s-kbspeed-row">
+      <label>KB Speed</label>
+      <select id="s-kbspeed">
+        <option value="normal">Normal</option>
+        <option value="slow">Slow</option>
+        <option value="slowest">Slowest</option>
+      </select>
     </div>
     <div class="s-row">
       <label>Order</label>
@@ -256,14 +263,14 @@
   const VIDEO_EXTS = /\.(mp4|mov|webm|m4v)$/i
   const TRANSITION_LIST = ['crossfade','slide_left','slide_right','slide_up','slide_down',
     'zoom_in','zoom_out','fade_black','wipe','curtain','rotate_fade','flip_h',
-    'blinds','iris','diagonal_wipe','clock_wipe',
+    'iris','diagonal_wipe','clock_wipe',
     'pixelate','glitch','shatter']
 
   const infoCache = {}
   let photos = []
   let queuePos = 0
   let displayedIndex = 0
-  let config = { interval: 10, transition: 'crossfade', kenBurns: false, order: 'random', fit: 'cover' }
+  let config = { interval: 10, transition: 'crossfade', kenBurns: false, kenBurnsSpeed: 'normal', order: 'random', fit: 'cover' }
   let timer = null
   let slotA, slotB, useA = true
   let isPaused = false
@@ -821,9 +828,11 @@
     group.forEach((fn, i) => incoming.appendChild(buildMediaItem(fn, infos[i])))
 
     if (config.kenBurns) {
+      const speedMult = config.kenBurnsSpeed === 'slowest' ? 3 : config.kenBurnsSpeed === 'slow' ? 2 : 1
+      const kbDuration = config.interval * speedMult
       incoming.querySelectorAll('.media-item img').forEach(img => {
         const n = 1 + Math.floor(Math.random() * 3)
-        img.style.animation = `kb${n} ${config.interval}s ease-in-out forwards`
+        img.style.animation = `kb${n} ${kbDuration}s ease-in-out forwards`
       })
     }
 
@@ -889,16 +898,18 @@
   const sIntervalV = document.getElementById('s-interval-val')
   const sTrans     = document.getElementById('s-transition')
   const sKB        = document.getElementById('s-kenburns')
+  const sKBSpeed   = document.getElementById('s-kbspeed')
   const sOrder     = document.getElementById('s-order')
   const sFit       = document.getElementById('s-fit')
 
   function openSettings() {
     sInterval.value = config.interval
     sIntervalV.textContent = config.interval + 's'
-    sTrans.value  = config.transition
-    sKB.checked   = !!config.kenBurns
-    sOrder.value  = config.order
-    sFit.value    = config.fit
+    sTrans.value    = config.transition
+    sKB.checked     = !!config.kenBurns
+    sKBSpeed.value  = config.kenBurnsSpeed || 'normal'
+    sOrder.value    = config.order
+    sFit.value      = config.fit
     overlay.classList.add('open')
   }
 
@@ -910,11 +921,12 @@
 
   document.getElementById('s-save-btn').addEventListener('click', async () => {
     const newCfg = {
-      interval:   parseInt(sInterval.value),
-      transition: sTrans.value,
-      kenBurns:   sKB.checked,
-      order:      sOrder.value,
-      fit:        sFit.value,
+      interval:      parseInt(sInterval.value),
+      transition:    sTrans.value,
+      kenBurns:      sKB.checked,
+      kenBurnsSpeed: sKBSpeed.value,
+      order:         sOrder.value,
+      fit:           sFit.value,
     }
     try {
       await fetch('/api/config', {
