@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slideshow</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: row;
+    opacity: 0;
+  }
+  .slide.stacked { flex-direction: column; }
+
+  .media-item {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+  }
+  .media-item + .media-item { margin-left: 2px; }
+  .slide.stacked .media-item + .media-item { margin-left: 0; margin-top: 2px; }
+
+  .media-item img,
+  .media-item video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
+  body.fit-contain .media-item img,
+  body.fit-contain .media-item video { object-fit: contain; }
+  .media-item video.portrait { object-fit: contain; }
+
+  @keyframes kb1 { from { transform: scale(1.0) translate(0,0); }    to { transform: scale(1.15) translate(-2%,-2%); } }
+  @keyframes kb2 { from { transform: scale(1.1) translate(-1%,1%); } to { transform: scale(1.0)  translate(2%,-1%); } }
+  @keyframes kb3 { from { transform: scale(1.0) translate(1%,-1%); } to { transform: scale(1.12) translate(-1%,2%); } }
+
+  #empty {
+    display: none;
+    position: absolute;
+    inset: 0;
+    color: #fff;
+    font-family: sans-serif;
+    font-size: 1.4rem;
+    text-align: center;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.6;
+  }
+  #empty.visible { display: flex; }
+
+  #counter {
+    position: fixed;
+    bottom: 12px;
+    right: 16px;
+    color: rgba(255,255,255,0.35);
+    font-family: sans-serif;
+    font-size: 0.85rem;
+    pointer-events: none;
+    z-index: 99;
+  }
+
+  /* Canvas for advanced transitions */
+  #fx-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+  }
+  #fx-canvas.active { opacity: 1; }
+
+  /* Settings overlay */
+  #settings-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  #settings-overlay.open { display: flex; }
+
+  #settings-panel {
+    background: #181818;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 28px 32px;
+    width: min(420px, 90vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+  }
+  #settings-panel h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #ddd;
+    margin-bottom: 22px;
+    letter-spacing: 0.04em;
+  }
+  #settings-panel .s-close {
+    position: absolute;
+    top: 16px; right: 18px;
+    background: none; border: none;
+    color: #555; font-size: 1.5rem; cursor: pointer; line-height: 1;
+  }
+  #settings-panel .s-close:hover { color: #ccc; }
+
+  .s-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .s-row label { font-size: 0.88rem; color: #aaa; flex-shrink: 0; }
+  .s-row select, .s-row input[type=number] {
+    background: #252525; border: 1px solid #3a3a3a; color: #ddd;
+    font-size: 0.85rem; padding: 6px 10px; border-radius: 6px;
+    outline: none; flex: 1; min-width: 0;
+  }
+  .s-row select:focus, .s-row input[type=number]:focus { border-color: #4a9eff; }
+
+  .s-toggle { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+  .s-toggle input { opacity: 0; width: 0; height: 0; }
+  .s-toggle-track {
+    position: absolute; inset: 0;
+    background: #333; border-radius: 12px; cursor: pointer; transition: background 0.2s;
+  }
+  .s-toggle input:checked + .s-toggle-track { background: #2d7abf; }
+  .s-toggle-track::after {
+    content: ''; position: absolute;
+    width: 18px; height: 18px; border-radius: 9px;
+    background: #fff; top: 3px; left: 3px;
+    transition: transform 0.2s;
+  }
+  .s-toggle input:checked + .s-toggle-track::after { transform: translateX(18px); }
+
+  #settings-panel .s-interval-val {
+    font-size: 0.8rem; color: #666; min-width: 36px; text-align: right;
+  }
+  #settings-panel .s-save {
+    width: 100%; margin-top: 20px; padding: 10px;
+    background: #1a4a7a; border: 1px solid #2d7abf; color: #aad4ff;
+    font-size: 0.95rem; font-weight: 600; border-radius: 8px; cursor: pointer;
+  }
+  #settings-panel .s-save:hover { background: #1e5a96; }
+
+  #settings-panel .s-resume {
+    width: 100%;
+    padding: 10px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-bottom: 12px;
+    display: none;
+  }
+  #settings-panel .s-resume:hover { background: #218838; }
+  #settings-panel.paused .s-resume { display: block; }
+
+  #settings-panel .s-hint {
+    font-size: 0.7rem; color: #444; text-align: center; margin-top: 12px;
+  }
+</style>
+</head>
+<body class="fit-cover">
+<div id="empty">
+  <div>No photos yet</div>
+  <div style="font-size:1rem;opacity:0.7">Upload via the manage page</div>
+</div>
+<div id="counter"></div>
+<canvas id="fx-canvas"></canvas>
+
+<!-- Settings overlay (long-press) -->
+<div id="settings-overlay">
+  <div id="settings-panel">
+    <h2>Slideshow Settings</h2>
+    <button class="s-close" id="s-close-btn">×</button>
+
+    <div class="s-row">
+      <label>Interval</label>
+      <input type="range" id="s-interval" min="3" max="120" step="1" style="flex:1">
+      <span class="s-interval-val" id="s-interval-val">10s</span>
+    </div>
+    <div class="s-row">
+      <label>Transition</label>
+      <select id="s-transition">
+        <option value="random">Random</option>
+        <option value="crossfade">Crossfade</option>
+        <option value="slide_left">Slide left</option>
+        <option value="slide_right">Slide right</option>
+        <option value="slide_up">Slide up</option>
+        <option value="slide_down">Slide down</option>
+        <option value="zoom_in">Zoom in</option>
+        <option value="zoom_out">Zoom out</option>
+        <option value="fade_black">Fade through black</option>
+        <option value="wipe">Wipe</option>
+        <option value="curtain">Curtain</option>
+        <option value="rotate_fade">Rotate &amp; fade</option>
+        <option value="flip_h">Flip</option>
+        <option value="barn_doors">Barn doors</option>
+        <option value="blinds">Blinds</option>
+        <option value="iris">Circle iris</option>
+        <option value="diagonal_wipe">Diagonal wipe</option>
+        <option value="clock_wipe">Clock wipe</option>
+        <option value="pixelate">Pixelate</option>
+        <option value="ripple">Ripple</option>
+        <option value="glitch">Glitch</option>
+        <option value="mosaic">Mosaic</option>
+        <option value="shatter">Shatter</option>
+        <option value="paint_brush">Paint brush</option>
+        <option value="none">None</option>
+      </select>
+    </div>
+    <div class="s-row">
+      <label>Ken Burns</label>
+      <label class="s-toggle">
+        <input type="checkbox" id="s-kenburns">
+        <div class="s-toggle-track"></div>
+      </label>
+    </div>
+    <div class="s-row">
+      <label>Order</label>
+      <select id="s-order">
+        <option value="random">Random</option>
+        <option value="sequential">Sequential</option>
+      </select>
+    </div>
+    <div class="s-row">
+      <label>Fit</label>
+      <select id="s-fit">
+        <option value="cover">Cover (fill)</option>
+        <option value="contain">Contain (letterbox)</option>
+      </select>
+    </div>
+
+    <button class="s-resume" id="s-resume-btn">▶ Resume Slideshow</button>
+    <button class="s-save" id="s-save-btn">Save</button>
+    <div class="s-hint">Hold screen to open settings · Changes sync to Home Assistant</div>
+  </div>
+</div>
+
+<script>
+  const VIDEO_EXTS = /\.(mp4|mov|webm|m4v)$/i
+  const TRANSITION_LIST = ['crossfade','slide_left','slide_right','slide_up','slide_down',
+    'zoom_in','zoom_out','fade_black','wipe','curtain','rotate_fade','flip_h',
+    'barn_doors','blinds','iris','diagonal_wipe','clock_wipe',
+    'pixelate','ripple','glitch','mosaic','shatter','paint_brush']
+
+  const infoCache = {}
+  let photos = []
+  let queuePos = 0
+  let displayedIndex = 0
+  let config = { interval: 10, transition: 'crossfade', kenBurns: false, order: 'random', fit: 'cover' }
+  let timer = null
+  let slotA, slotB, useA = true
+  let isPaused = false
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function isVideo(fn) { return VIDEO_EXTS.test(fn) }
+  function screenLandscape() { return window.innerWidth >= window.innerHeight }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+  }
+
+  function getInfo(filename) {
+    if (infoCache[filename]) return Promise.resolve(infoCache[filename])
+    return new Promise(resolve => {
+      if (isVideo(filename)) {
+        const v = document.createElement('video')
+        v.preload = 'metadata'; v.muted = true
+        const done = () => resolve(infoCache[filename] = {
+          w: v.videoWidth || 1920, h: v.videoHeight || 1080,
+          isVideo: true,
+          duration: isFinite(v.duration) && v.duration > 0 ? v.duration : 30
+        })
+        v.onloadedmetadata = done; v.onerror = done
+        v.src = '/photos/' + encodeURIComponent(filename)
+      } else {
+        const img = new Image()
+        const done = () => resolve(infoCache[filename] = {
+          w: img.naturalWidth || 1920, h: img.naturalHeight || 1080,
+          isVideo: false
+        })
+        img.onload = done; img.onerror = done
+        img.src = '/photos/' + encodeURIComponent(filename)
+      }
+    })
+  }
+
+  function needsDual(info) {
+    const ar = info.w / info.h
+    return screenLandscape() ? ar < 0.85 : ar > 1.20
+  }
+
+  function nextFrame() {
+    return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+  }
+
+  // ── Group selection ───────────────────────────────────────────────────────
+
+  async function getNextGroup() {
+    if (!photos.length) return []
+    displayedIndex = queuePos % photos.length
+    const firstFn = photos[displayedIndex]
+    const firstInfo = await getInfo(firstFn)
+    if (needsDual(firstInfo) && photos.length >= 2) {
+      const secondFn = photos[(queuePos + 1) % photos.length]
+      queuePos = (queuePos + 2) % photos.length
+      return [firstFn, secondFn]
+    }
+    queuePos = (queuePos + 1) % photos.length
+    return [firstFn]
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────────────
+
+  function buildMediaItem(fn, info) {
+    const item = document.createElement('div')
+    item.className = 'media-item'
+    if (info.isVideo) {
+      const v = document.createElement('video')
+      v.muted = true; v.playsInline = true; v.loop = true
+      if (info.h > info.w) v.classList.add('portrait')
+      v.src = '/photos/' + encodeURIComponent(fn)
+      const startVideo = () => {
+        const safeWindow = Math.max(0, info.duration - 2)
+        v.currentTime = safeWindow > 1 ? Math.random() * safeWindow : 0
+        v.play().catch(() => {})
+      }
+      if (v.readyState >= 1) setTimeout(startVideo, 0)
+      else v.onloadedmetadata = startVideo
+      item.appendChild(v)
+    } else {
+      const img = document.createElement('img')
+      img.src = '/photos/' + encodeURIComponent(fn)
+      img.alt = fn
+      item.appendChild(img)
+    }
+    return item
+  }
+
+  // ── Canvas-based transitions ──────────────────────────────────────────────
+
+  const fxCanvas = document.getElementById('fx-canvas')
+  const fxCtx = fxCanvas.getContext('2d', { alpha: false })
+
+  function resizeCanvas() {
+    fxCanvas.width = window.innerWidth
+    fxCanvas.height = window.innerHeight
+  }
+  resizeCanvas()
+  window.addEventListener('resize', resizeCanvas)
+
+  // Capture a slide element to an Image
+  async function captureSlideToImage(slide) {
+    const mediaItem = slide.querySelector('.media-item')
+    if (!mediaItem) return null
+    const elem = mediaItem.querySelector('img, video')
+    if (!elem) return null
+    
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    if (elem.tagName === 'VIDEO') {
+      const canvas = document.createElement('canvas')
+      canvas.width = elem.videoWidth || window.innerWidth
+      canvas.height = elem.videoHeight || window.innerHeight
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(elem, 0, 0, canvas.width, canvas.height)
+      img.src = canvas.toDataURL()
+    } else {
+      img.src = elem.src
+    }
+    await new Promise((resolve, reject) => {
+      img.onload = resolve
+      img.onerror = reject
+      if (img.complete) resolve()
+    })
+    return img
+  }
+
+  // Draw image to fill canvas maintaining aspect ratio
+  function drawImageCover(ctx, img, x, y, w, h) {
+    const imgAr = img.width / img.height
+    const canvasAr = w / h
+    let sx = 0, sy = 0, sw = img.width, sh = img.height
+    if (imgAr > canvasAr) {
+      sw = img.height * canvasAr
+      sx = (img.width - sw) / 2
+    } else {
+      sh = img.width / canvasAr
+      sy = (img.height - sh) / 2
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
+  }
+
+  async function doCanvasTransition(t, oldImg, newImg, duration = 1200) {
+    const w = fxCanvas.width
+    const h = fxCanvas.height
+    fxCanvas.classList.add('active')
+
+    const startTime = performance.now()
+    
+    function animate() {
+      const elapsed = performance.now() - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      
+      fxCtx.clearRect(0, 0, w, h)
+
+      switch (t) {
+        case 'pixelate':
+          doPixelate(oldImg, newImg, progress)
+          break
+        case 'ripple':
+          doRipple(oldImg, newImg, progress)
+          break
+        case 'glitch':
+          doGlitch(oldImg, newImg, progress)
+          break
+        case 'mosaic':
+          doMosaic(oldImg, newImg, progress)
+          break
+        case 'shatter':
+          doShatter(oldImg, newImg, progress)
+          break
+        case 'paint_brush':
+          doPaintBrush(oldImg, newImg, progress)
+          break
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(animate)
+      } else {
+        fxCanvas.classList.remove('active')
+      }
+    }
+    animate()
+  }
+
+  function doPixelate(oldImg, newImg, progress) {
+    const w = fxCanvas.width, h = fxCanvas.height
+    if (progress < 0.5) {
+      // Pixelate old image progressively
+      const blockSize = Math.floor(1 + progress * 2 * 40)
+      for (let y = 0; y < h; y += blockSize) {
+        for (let x = 0; x < w; x += blockSize) {
+          const sx = Math.floor((x / w) * oldImg.width)
+          const sy = Math.floor((y / h) * oldImg.height)
+          const sw = Math.ceil((blockSize / w) * oldImg.width)
+          const sh = Math.ceil((blockSize / h) * oldImg.height)
+          fxCtx.drawImage(oldImg, sx, sy, sw, sh, x, y, blockSize, blockSize)
+        }
+      }
+    } else {
+      // Un-pixelate new image
+      const p2 = (progress - 0.5) * 2
+      const blockSize = Math.floor(40 - p2 * 40) + 1
+      for (let y = 0; y < h; y += blockSize) {
+        for (let x = 0; x < w; x += blockSize) {
+          const sx = Math.floor((x / w) * newImg.width)
+          const sy = Math.floor((y / h) * newImg.height)
+          const sw = Math.ceil((blockSize / w) * newImg.width)
+          const sh = Math.ceil((blockSize / h) * newImg.height)
+          fxCtx.drawImage(newImg, sx, sy, sw, sh, x, y, blockSize, blockSize)
+        }
+      }
+    }
+  }
+
+  function doRipple(oldImg, newImg, progress) {
+    const w = fxCanvas.width, h = fxCanvas.height
+    drawImageCover(fxCtx, oldImg, 0, 0, w, h)
+    
+    const waveCount = 3
+    const amplitude = 12
+    const frequency = Math.PI * waveCount
+    
+    fxCtx.globalAlpha = progress
+    const offscreen = document.createElement('canvas')
+    offscreen.width = w; offscreen.height = h
+    const octx = offscreen.getContext('2d')
+    drawImageCover(octx, newImg, 0, 0, w, h)
+    
+    for (let y = 0; y < h; y++) {
+      const offset = Math.sin((y / h) * frequency + progress * Math.PI * 2) * amplitude * (1 - progress)
+      fxCtx.drawImage(offscreen, 0, y, w, 1, offset, y, w, 1)
+    }
+    fxCtx.globalAlpha = 1
+  }
+
+  function doGlitch(oldImg, newImg, progress) {
+    const w = fxCanvas.width, h = fxCanvas.height
+    if (progress < 0.3) {
+      drawImageCover(fxCtx, oldImg, 0, 0, w, h)
+      // Random horizontal slices offset
+      for (let i = 0; i < 8; i++) {
+        const y = Math.random() * h
+        const sliceH = 20 + Math.random() * 40
+        const offset = (Math.random() - 0.5) * 60
+        fxCtx.drawImage(fxCanvas, 0, y, w, sliceH, offset, y, w, sliceH)
+      }
+    } else {
+      drawImageCover(fxCtx, newImg, 0, 0, w, h)
+    }
+  }
+
+  function doMosaic(oldImg, newImg, progress) {
+    const w = fxCanvas.width, h = fxCanvas.height
+    const cols = 10, rows = 6
+    const tileW = w / cols, tileH = h / rows
+    
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const delay = ((c + r) / (cols + rows)) * 0.7
+        const tileProgress = Math.max(0, Math.min(1, (progress - delay) / 0.3))
+        
+        const x = c * tileW, y = r * tileH
+        const sx = (c / cols) * oldImg.width, sy = (r / rows) * oldImg.height
+        const sw = oldImg.width / cols, sh = oldImg.height / rows
+        const nsx = (c / cols) * newImg.width, nsy = (r / rows) * newImg.height
+        const nsw = newImg.width / cols, nsh = newImg.height / rows
+        
+        fxCtx.save()
+        fxCtx.translate(x + tileW / 2, y + tileH / 2)
+        
+        const angle = tileProgress * Math.PI
+        fxCtx.rotate(angle)
+        
+        if (tileProgress < 0.5) {
+          const scale = Math.cos(angle)
+          fxCtx.scale(Math.abs(scale), 1)
+          fxCtx.drawImage(oldImg, sx, sy, sw, sh, -tileW / 2, -tileH / 2, tileW, tileH)
+        } else {
+          const scale = -Math.cos(angle)
+          fxCtx.scale(Math.abs(scale), 1)
+          fxCtx.drawImage(newImg, nsx, nsy, nsw, nsh, -tileW / 2, -tileH / 2, tileW, tileH)
+        }
+        
+        fxCtx.restore()
+      }
+    }
+  }
+
+  function doShatter(oldImg, newImg, progress) {
+    const w = fxCanvas.width, h = fxCanvas.height
+    if (progress < 0.3) {
+      drawImageCover(fxCtx, oldImg, 0, 0, w, h)
+    } else if (progress < 0.7) {
+      // Shatter old into pieces that fly away
+      const p = (progress - 0.3) / 0.4
+      const pieces = 20
+      for (let i = 0; i < pieces; i++) {
+        const px = (i % 5) * (w / 5)
+        const py = Math.floor(i / 5) * (h / 4)
+        const pw = w / 5, ph = h / 4
+        
+        const vx = (Math.random() - 0.5) * 300 * p
+        const vy = -200 * p + Math.random() * 100 * p
+        const rotation = (Math.random() - 0.5) * Math.PI * p
+        
+        fxCtx.save()
+        fxCtx.translate(px + pw / 2 + vx, py + ph / 2 + vy)
+        fxCtx.rotate(rotation)
+        fxCtx.globalAlpha = 1 - p
+        
+        const sx = (px / w) * oldImg.width, sy = (py / h) * oldImg.height
+        const sw = (pw / w) * oldImg.width, sh = (ph / h) * oldImg.height
+        fxCtx.drawImage(oldImg, sx, sy, sw, sh, -pw / 2, -ph / 2, pw, ph)
+        
+        fxCtx.restore()
+      }
+    } else {
+      // Fade in new
+      const p = (progress - 0.7) / 0.3
+      fxCtx.globalAlpha = p
+      drawImageCover(fxCtx, newImg, 0, 0, w, h)
+      fxCtx.globalAlpha = 1
+    }
+  }
+
+  function doPaintBrush(oldImg, newImg, progress) {
+    const w = fxCanvas.width, h = fxCanvas.height
+    drawImageCover(fxCtx, oldImg, 0, 0, w, h)
+    
+    // Paint brush strokes revealing new image
+    const strokes = 30
+    fxCtx.globalCompositeOperation = 'source-over'
+    
+    for (let i = 0; i < strokes; i++) {
+      const strokeProgress = Math.max(0, Math.min(1, (progress - i / strokes) / (1 / strokes)))
+      if (strokeProgress <= 0) continue
+      
+      const startX = (i / strokes) * w
+      const startY = Math.random() * h
+      const endX = startX + w * 0.15
+      const endY = startY + (Math.random() - 0.5) * h * 0.3
+      
+      const x = startX + (endX - startX) * strokeProgress
+      const y = startY + (endY - startY) * strokeProgress
+      
+      fxCtx.save()
+      fxCtx.beginPath()
+      fxCtx.arc(x, y, 60, 0, Math.PI * 2)
+      fxCtx.clip()
+      drawImageCover(fxCtx, newImg, 0, 0, w, h)
+      fxCtx.restore()
+    }
+  }
+
+  // ── CSS/DOM transitions ───────────────────────────────────────────────────
+
+  async function doTransition(incoming, outgoing) {
+    let t = config.transition
+    if (t === 'random') t = TRANSITION_LIST[Math.floor(Math.random() * TRANSITION_LIST.length)]
+
+    // Canvas-based transitions
+    const canvasTransitions = ['pixelate', 'ripple', 'glitch', 'mosaic', 'shatter', 'paint_brush']
+    if (canvasTransitions.includes(t)) {
+      incoming.style.cssText = 'opacity:0;transform:none;transition:none'
+      outgoing.style.cssText = 'opacity:1;transform:none;transition:none'
+      
+      const oldImg = await captureSlideToImage(outgoing)
+      const newImg = await captureSlideToImage(incoming)
+      
+      if (oldImg && newImg) {
+        await doCanvasTransition(t, oldImg, newImg)
+      }
+      
+      outgoing.style.cssText = 'opacity:0;transform:none;transition:none'
+      incoming.style.cssText = 'opacity:1;transform:none;transition:none'
+      cleanupSlot(outgoing)
+      return
+    }
+
+    // Set incoming initial state
+    const noMotion = { none: 1, wipe: 1, curtain: 1, fade_black: 1, flip_h: 1, barn_doors: 1, blinds: 1, iris: 1, diagonal_wipe: 1, clock_wipe: 1 }
+    if (!noMotion[t]) {
+      const initialTransform = {
+        slide_left:  'translateX(100%)',
+        slide_right: 'translateX(-100%)',
+        slide_up:    'translateY(100%)',
+        slide_down:  'translateY(-100%)',
+        zoom_in:     'scale(1.1)',
+        zoom_out:    'scale(0.92)',
+        rotate_fade: 'rotate(-4deg) scale(0.95)',
+      }
+      const tr = initialTransform[t] || 'none'
+      const needsOpacity = !t.startsWith('slide_')
+      incoming.style.cssText = `opacity:${needsOpacity ? 0 : 1};transform:${tr};transition:none`
+    } else {
+      incoming.style.cssText = 'opacity:1;transform:none;transition:none'
+    }
+
+    if (t === 'none') {
+      incoming.style.cssText = 'opacity:1;transform:none;transition:none'
+      outgoing.style.cssText = 'opacity:0;transform:none;transition:none'
+      cleanupSlot(outgoing)
+      return
+    }
+
+    if (t === 'wipe') {
+      incoming.style.clipPath = 'inset(0 100% 0 0)'
+      incoming.style.opacity = '1'
+      await nextFrame()
+      incoming.style.transition = 'clip-path 0.9s ease'
+      incoming.style.clipPath = 'inset(0 0% 0 0)'
+      outgoing.style.cssText = 'opacity:1;transition:none'
+      setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1000)
+      return
+    }
+
+    if (t === 'curtain') {
+      incoming.style.clipPath = 'inset(0 50%)'
+      incoming.style.opacity = '1'
+      await nextFrame()
+      incoming.style.transition = 'clip-path 0.9s ease'
+      incoming.style.clipPath = 'inset(0 0%)'
+      outgoing.style.cssText = 'opacity:1;transition:none'
+      setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1000)
+      return
+    }
+
+    if (t === 'barn_doors') {
+      incoming.style.clipPath = 'inset(0 50% 0 50%)'
+      incoming.style.opacity = '1'
+      await nextFrame()
+      incoming.style.transition = 'clip-path 0.9s ease'
+      incoming.style.clipPath = 'inset(0 0% 0 0%)'
+      outgoing.style.cssText = 'opacity:1;transition:none'
+      setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1000)
+      return
+    }
+
+    if (t === 'blinds') {
+      incoming.style.opacity = '1'
+      const strips = 8
+      for (let i = 0; i < strips; i++) {
+        const top = (i / strips) * 100
+        const bottom = ((strips - i - 1) / strips) * 100
+        setTimeout(() => {
+          incoming.style.clipPath = `inset(${top}% 0 ${bottom}% 0)`
+        }, i * 80)
+      }
+      await new Promise(r => setTimeout(r, strips * 80 + 200))
+      incoming.style.clipPath = ''
+      cleanupSlot(outgoing)
+      return
+    }
+
+    if (t === 'iris') {
+      incoming.style.clipPath = 'circle(0% at 50% 50%)'
+      incoming.style.opacity = '1'
+      await nextFrame()
+      incoming.style.transition = 'clip-path 1.0s ease'
+      incoming.style.clipPath = 'circle(100% at 50% 50%)'
+      outgoing.style.cssText = 'opacity:1;transition:none'
+      setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1100)
+      return
+    }
+
+    if (t === 'diagonal_wipe') {
+      incoming.style.clipPath = 'polygon(0 0, 0 0, 0 100%)'
+      incoming.style.opacity = '1'
+      await nextFrame()
+      incoming.style.transition = 'clip-path 0.9s ease'
+      incoming.style.clipPath = 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'
+      outgoing.style.cssText = 'opacity:1;transition:none'
+      setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1000)
+      return
+    }
+
+    if (t === 'clock_wipe') {
+      // Sweep clockwise using polygon
+      const steps = 60
+      let angle = 0
+      const interval = setInterval(() => {
+        angle += (360 / steps)
+        const rad = (angle - 90) * Math.PI / 180
+        const x = 50 + 50 * Math.cos(rad)
+        const y = 50 + 50 * Math.sin(rad)
+        if (angle <= 90) {
+          incoming.style.clipPath = `polygon(50% 50%, 50% 0%, ${x}% ${y}%)`
+        } else if (angle <= 180) {
+          incoming.style.clipPath = `polygon(50% 50%, 50% 0%, 100% 0%, ${x}% ${y}%)`
+        } else if (angle <= 270) {
+          incoming.style.clipPath = `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, ${x}% ${y}%)`
+        } else {
+          incoming.style.clipPath = `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, ${x}% ${y}%)`
+        }
+        if (angle >= 360) {
+          clearInterval(interval)
+          incoming.style.clipPath = ''
+          cleanupSlot(outgoing)
+        }
+      }, 15)
+      incoming.style.opacity = '1'
+      return
+    }
+
+    if (t === 'flip_h') {
+      outgoing.style.cssText = 'opacity:1;transform:perspective(800px) rotateY(0deg);transition:transform 0.4s ease'
+      incoming.style.cssText = 'opacity:0;transform:perspective(800px) rotateY(90deg);transition:none'
+      await nextFrame()
+      outgoing.style.transform = 'perspective(800px) rotateY(-90deg)'
+      await new Promise(r => setTimeout(r, 420))
+      incoming.style.cssText = 'opacity:1;transform:perspective(800px) rotateY(0deg);transition:transform 0.4s ease'
+      setTimeout(() => cleanupSlot(outgoing), 500)
+      return
+    }
+
+    if (t === 'fade_black') {
+      outgoing.style.cssText = 'opacity:0;transform:none;transition:opacity 0.55s ease'
+      incoming.style.cssText = 'opacity:0;transform:none;transition:none'
+      await new Promise(r => setTimeout(r, 600))
+      incoming.style.cssText = 'opacity:1;transform:none;transition:opacity 0.55s ease'
+      cleanupSlot(outgoing)
+      return
+    }
+
+    await nextFrame()
+
+    if (t.startsWith('slide_')) {
+      const axis = (t === 'slide_up' || t === 'slide_down') ? 'Y' : 'X'
+      incoming.style.cssText = `opacity:1;transform:none;transition:transform 0.9s ease`
+      outgoing.style.cssText = `opacity:1;transform:translate${axis}(${t === 'slide_left' || t === 'slide_up' ? '-' : ''}100%);transition:transform 0.9s ease`
+      setTimeout(() => cleanupSlot(outgoing), 1000)
+    } else {
+      // zoom_in, zoom_out, rotate_fade, crossfade
+      incoming.style.cssText = 'opacity:1;transform:none;transition:opacity 1.1s ease,transform 1.1s ease'
+      outgoing.style.cssText = 'opacity:0;transform:none;transition:opacity 0.8s ease'
+      setTimeout(() => cleanupSlot(outgoing), 1200)
+    }
+  }
+
+  async function showGroup(group) {
+    if (!group.length) return
+    const infos = await Promise.all(group.map(getInfo))
+    const isDual  = group.length > 1
+    const isStack = isDual && !screenLandscape()
+
+    const incoming = useA ? slotA : slotB
+    const outgoing = useA ? slotB : slotA
+    useA = !useA
+
+    incoming.innerHTML = ''
+    incoming.className = 'slide' + (isStack ? ' stacked' : '')
+    group.forEach((fn, i) => incoming.appendChild(buildMediaItem(fn, infos[i])))
+
+    if (!isDual && config.kenBurns && !infos[0].isVideo) {
+      const img = incoming.querySelector('img')
+      if (img) {
+        const n = 1 + Math.floor(Math.random() * 3)
+        img.style.animation = `kb${n} ${config.interval}s ease-in-out forwards`
+      }
+    }
+
+    await doTransition(incoming, outgoing)
+
+    document.getElementById('counter').textContent = (displayedIndex + 1) + ' / ' + photos.length
+    if (photos.length > 0) getInfo(photos[queuePos % photos.length])
+  }
+
+  function cleanupSlot(slot) {
+    slot.querySelectorAll('video').forEach(v => v.pause())
+    slot.innerHTML = ''
+    slot.style.cssText = 'opacity:0;transform:none;transition:none;clip-path:none'
+  }
+
+  // ── Timer & public API ────────────────────────────────────────────────────
+
+  async function advance() {
+    const group = await getNextGroup()
+    if (group.length) await showGroup(group)
+  }
+
+  function startTimer() {
+    if (timer) clearInterval(timer)
+    timer = setInterval(advance, config.interval * 1000)
+  }
+
+  window.nextSlide = function() { clearInterval(timer); advance(); startTimer() }
+
+  window.prevSlide = function() {
+    queuePos = ((queuePos - 2) + photos.length * 4) % photos.length
+    clearInterval(timer); advance(); startTimer()
+  }
+
+  window.setConfig = function(updates) {
+    const prevOrder = config.order
+    Object.assign(config, updates)
+    document.body.className = 'fit-' + config.fit
+    document.documentElement.style.setProperty('--dur', config.interval + 's')
+    if (updates.order && updates.order !== prevOrder) {
+      if (config.order === 'random') shuffle(photos)
+      else photos.sort()
+      queuePos = 0
+    }
+    if (timer) startTimer()
+  }
+
+  window.reloadPhotos = async function() {
+    try {
+      const res = await fetch('/api/photos')
+      const list = await res.json()
+      if (config.order === 'random') shuffle(list)
+      else list.sort()
+      photos = list.map(f => f.name || f)
+      document.getElementById('empty').classList.toggle('visible', photos.length === 0)
+    } catch(e) { console.error('reloadPhotos', e) }
+  }
+
+  // ── Long-press → settings overlay ────────────────────────────────────────
+
+  const overlay    = document.getElementById('settings-overlay')
+  const sInterval  = document.getElementById('s-interval')
+  const sIntervalV = document.getElementById('s-interval-val')
+  const sTrans     = document.getElementById('s-transition')
+  const sKB        = document.getElementById('s-kenburns')
+  const sOrder     = document.getElementById('s-order')
+  const sFit       = document.getElementById('s-fit')
+
+  function openSettings() {
+    sInterval.value = config.interval
+    sIntervalV.textContent = config.interval + 's'
+    sTrans.value  = config.transition
+    sKB.checked   = !!config.kenBurns
+    sOrder.value  = config.order
+    sFit.value    = config.fit
+    overlay.classList.add('open')
+  }
+
+  sInterval.addEventListener('input', () => { sIntervalV.textContent = sInterval.value + 's' })
+
+  document.getElementById('s-close-btn').addEventListener('click', () => {
+    overlay.classList.remove('open')
+  })
+
+  document.getElementById('s-save-btn').addEventListener('click', async () => {
+    const newCfg = {
+      interval:   parseInt(sInterval.value),
+      transition: sTrans.value,
+      kenBurns:   sKB.checked,
+      order:      sOrder.value,
+      fit:        sFit.value,
+    }
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCfg)
+      })
+      window.setConfig(newCfg)
+    } catch(e) { console.error('save config', e) }
+    overlay.classList.remove('open')
+  })
+
+  document.getElementById('s-resume-btn').addEventListener('click', () => {
+    resumeSlideshow()
+    overlay.classList.remove('open')
+  })
+
+  // Long-press detection (500ms hold, cancel on >8px movement)
+  let pressTimer = null
+  let pressStart = { x: 0, y: 0 }
+
+  function startPress(x, y) {
+    pressStart = { x, y }
+    pressTimer = setTimeout(() => { pressTimer = null; openSettings() }, 500)
+  }
+  function cancelPress(x, y) {
+    if (!pressTimer) return
+    if (x !== undefined) {
+      const dx = x - pressStart.x, dy = y - pressStart.y
+      if (dx * dx + dy * dy < 64) return  // <8px — not a drag
+    }
+    clearTimeout(pressTimer); pressTimer = null
+  }
+
+  document.addEventListener('mousedown',  e => { if (!overlay.classList.contains('open')) startPress(e.clientX, e.clientY) })
+  document.addEventListener('mouseup',    e => cancelPress(e.clientX, e.clientY))
+  document.addEventListener('mousemove',  e => cancelPress(e.clientX, e.clientY))
+  document.addEventListener('touchstart', e => { if (!overlay.classList.contains('open')) startPress(e.touches[0].clientX, e.touches[0].clientY) }, { passive: true })
+  document.addEventListener('touchend',   () => cancelPress())
+  document.addEventListener('touchmove',  e => cancelPress(e.touches[0].clientX, e.touches[0].clientY), { passive: true })
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  async function init() {
+    slotA = document.createElement('div')
+    slotB = document.createElement('div')
+    slotA.className = slotB.className = 'slide'
+    slotA.style.cssText = slotB.style.cssText = 'opacity:0'
+    document.body.appendChild(slotA)
+    document.body.appendChild(slotB)
+
+    // Check for preview mode
+    const params = new URLSearchParams(window.location.search)
+    const previewFile = params.get('preview')
+    
+    if (previewFile) {
+      // Preview mode: show only this image, no rotation, ESC to close
+      try {
+        const cfg = await fetch('/api/config').then(r => r.json())
+        Object.assign(config, cfg)
+        document.body.className = 'fit-' + config.fit
+        
+        photos = [previewFile]
+        await advance()
+        
+        // Add ESC key handler to close window
+        document.addEventListener('keydown', e => {
+          if (e.key === 'Escape') window.close()
+        })
+      } catch(e) { console.error('preview init', e) }
+      return
+    }
+
+    // Normal slideshow mode
+    try {
+      const [photosRes, configRes] = await Promise.all([
+        fetch('/api/photos'),
+        fetch('/api/config')
+      ])
+      const list = await photosRes.json()
+      const cfg  = await configRes.json()
+      Object.assign(config, cfg)
+      document.body.className = 'fit-' + config.fit
+      document.documentElement.style.setProperty('--dur', config.interval + 's')
+
+      if (config.order === 'random') shuffle(list)
+      photos = list.map(f => f.name || f)
+      document.getElementById('empty').classList.toggle('visible', photos.length === 0)
+
+      if (photos.length > 0) {
+        await advance()
+        startTimer()
+      }
+    } catch(e) { console.error('init', e) }
+
+    setInterval(window.reloadPhotos, 5 * 60 * 1000)
+    
+    // Start polling for show-now commands (remote control)
+    if (!previewFile) {
+      startCommandPolling()
+    }
+  }
+
+  // Poll for show-now commands from manage page
+  async function pollShowNow() {
+    try {
+      const res = await fetch('/api/show-now')
+      const data = await res.json()
+      console.log('[slideshow-poll]', data)
+      
+      if (data.resume) {
+        // Manage page closed lightbox, resume normal slideshow
+        console.log('[slideshow-poll] Resuming slideshow')
+        resumeSlideshow()
+      } else if (data.filename) {
+        console.log('[slideshow-poll] Calling showNow with:', data.filename)
+        await showNow(data.filename)
+      }
+    } catch (e) {
+      console.error('poll show-now', e)
+    }
+  }
+
+  async function showNow(filename) {
+    console.log('[showNow] START - filename:', filename)
+    console.log('[showNow] Current photos array length:', photos.length)
+    console.log('[showNow] Current queuePos:', queuePos)
+    console.log('[showNow] Current isPaused:', isPaused)
+    
+    // Show specific image and PAUSE slideshow (stay on this image)
+    if (timer) clearInterval(timer)
+    timer = null
+    isPaused = true
+    const panel = document.getElementById('settings-panel')
+    if (panel) panel.classList.add('paused')
+    
+    // Find the image in our photos array
+    const idx = photos.indexOf(filename)
+    console.log('[showNow] Index of', filename, 'in photos:', idx)
+    
+    if (idx !== -1) {
+      queuePos = idx
+      console.log('[showNow] Found in array, set queuePos to', queuePos)
+    } else {
+      // Image not in rotation, add it temporarily as the current image
+      photos.push(filename)
+      queuePos = photos.length - 1
+      console.log('[showNow] Not found, added to array, queuePos now', queuePos)
+    }
+    
+    console.log('[showNow] Calling advance()...')
+    // Show this image and stay on it
+    await advance()
+    console.log('[showNow] DONE')
+  }
+  
+  function resumeSlideshow() {
+    isPaused = false
+    const panel = document.getElementById('settings-panel')
+    if (panel) panel.classList.remove('paused')
+    startTimer()
+  }
+
+  function startCommandPolling() {
+    setInterval(pollShowNow, 2000)  // Poll every 2 seconds
+  }
+
+  init()
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Media files (too large for git)
+photos/
+videos/
+uploads/
+
+# Runtime data
+*.log
+logs/
+pids/
+*.pid
+*.seed
+
+# Environment and config (may contain secrets)
+.env
+.env.local
+ha_sync.json
+config.json
+
+# Metadata
+meta.json
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace

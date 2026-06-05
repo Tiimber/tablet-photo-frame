@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slideshow Manager</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #111; color: #eee; min-height: 100vh; padding: 24px 24px 80px; }
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 20px; color: #fff; }
+
+  #dropzone {
+    border: 2px dashed #444;
+    border-radius: 12px;
+    padding: 40px 24px;
+    text-align: center;
+    color: #888;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 24px;
+  }
+  #dropzone.over { border-color: #4a9eff; background: rgba(74,158,255,0.07); color: #4a9eff; }
+  #dropzone p { font-size: 1rem; margin-bottom: 6px; }
+  #dropzone small { font-size: 0.8rem; opacity: 0.6; }
+  #fileInput { display: none; }
+
+  #progress { margin-bottom: 20px; display: none; }
+  #progressBar { width: 100%; height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
+  #progressFill { height: 100%; background: #4a9eff; width: 0%; transition: width 0.2s; }
+  #progressLabel { font-size: 0.8rem; color: #888; margin-top: 6px; }
+
+  /* Marquee (rubber-band) selection */
+  #marquee {
+    display: none;
+    position: fixed;
+    border: 1.5px dashed #4a9eff;
+    background: rgba(74,158,255,0.10);
+    pointer-events: none;
+    z-index: 200;
+    border-radius: 2px;
+    box-sizing: border-box;
+  }
+  body.is-marquee-dragging, body.is-marquee-dragging * { cursor: crosshair !important; user-select: none !important; }
+
+  #failed-section { display: none; margin-bottom: 20px; background: #1e0a0a;
+    border: 1px solid #8b2020; border-radius: 8px; padding: 12px 14px; }
+  #failed-section h3 { font-size: 0.8rem; color: #e74c3c; margin: 0 0 8px;
+    display: flex; justify-content: space-between; align-items: center; }
+  #failed-section h3 button { font-size: 0.75rem; background: none; border: none;
+    color: #888; cursor: pointer; padding: 0; }
+  #failed-section h3 button:hover { color: #eee; }
+  #failed-list { font-size: 0.72rem; color: #ccc; line-height: 1.8;
+    max-height: 160px; overflow-y: auto; word-break: break-all; }
+
+  #count { font-size: 0.85rem; color: #666; margin-bottom: 14px; }
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .thumb {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #222;
+    aspect-ratio: 1;
+  }
+  .thumb img,
+  .thumb video {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .thumb .del {
+    position: absolute;
+    top: 6px; right: 6px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 28px; height: 28px;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .thumb:hover .del { opacity: 1; }
+  .thumb .del:hover { background: #c0392b; }
+
+  /* Always-visible info bar */
+  .thumb .info-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.82) 45%);
+    padding: 22px 7px 6px;
+    pointer-events: none;
+  }
+  .thumb .display-name {
+    display: block;
+    color: #eee;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: auto;
+    cursor: text;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s;
+  }
+  .thumb .display-name:hover { border-bottom-color: rgba(255,255,255,0.3); }
+  .thumb .file-size {
+    display: block;
+    color: rgba(255,255,255,0.45);
+    font-size: 0.62rem;
+    margin-top: 2px;
+  }
+  .thumb .photo-date {
+    position: absolute;
+    bottom: 6px;
+    right: 7px;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.6rem;
+    pointer-events: none;
+  }
+  .thumb .name-input {
+    display: block;
+    width: 100%;
+    background: rgba(0,0,0,0.75);
+    border: 1px solid #4a9eff;
+    color: #fff;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    outline: none;
+    pointer-events: auto;
+    box-sizing: border-box;
+  }
+
+  /* Video badge */
+  .video-badge {
+    position: absolute;
+    top: 6px; left: 6px;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    pointer-events: none;
+    letter-spacing: 0.05em;
+  }
+
+  /* Orientation indicator — CSS-drawn rectangle, top-right of thumb */
+  .orient-badge {
+    position: absolute;
+    top: 7px; right: 7px;
+    border: 1.5px solid rgba(255,255,255,0.4);
+    border-radius: 2px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .orient-badge.portrait  { width: 9px;  height: 14px; opacity: 1; }
+  .orient-badge.landscape { width: 14px; height: 9px;  opacity: 1; }
+  .orient-badge.square    { width: 10px; height: 10px; opacity: 1; }
+
+  #empty-msg { color: #555; text-align: center; padding: 40px; display: none; }
+
+  /* Queue section */
+  #queue-section { margin-bottom: 22px; }
+  #queue-section h2 { font-size: 0.85rem; font-weight: 600; color: #aaa; margin-bottom: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+  #queue-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .queue-card {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #1a1a30;
+    aspect-ratio: 1;
+    border: 1px solid #2a2a4a;
+  }
+  .queue-card img {
+    position: absolute;
+    inset: 0; width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 0.45;
+  }
+  .queue-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .queue-overlay .q-icon { font-size: 2rem; }
+  .queue-overlay .q-status-text { font-size: 0.68rem; color: #ccc; text-align: center; padding: 0 8px; line-height: 1.3; }
+  /* Video progress bar */
+  .q-progress-wrap {
+    width: 80%;
+    height: 5px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .q-progress-bar {
+    height: 100%;
+    background: #4a9eff;
+    border-radius: 3px;
+    transition: width 0.8s linear;
+  }
+  .q-pct { font-size: 0.7rem; color: #4a9eff; font-weight: 600; }
+  .queue-card .q-name {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.7);
+    color: #ccc;
+    font-size: 0.65rem;
+    padding: 4px 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .queue-card.status-error { border-color: #8b2020; }
+  .queue-card.status-error .q-icon { color: #e74c3c; }
+  .q-error-msg { font-size: 0.62rem; color: #e74c3c; padding: 0 8px; text-align: center; line-height: 1.3; max-height: 3em; overflow: hidden; word-break: break-all; }
+  .q-dismiss {
+    position: absolute;
+    top: 5px; right: 6px;
+    background: rgba(0,0,0,0.6);
+    border: none; color: #aaa;
+    border-radius: 50%;
+    width: 22px; height: 22px;
+    font-size: 1rem; line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .q-dismiss:hover { background: #c0392b; color: #fff; }
+  .queue-card.status-processing .q-icon { color: #4a9eff; }
+  @keyframes spin { to { transform: rotate(360deg) } }
+  .spin-ring {
+    display: inline-block; width: 1em; height: 1em;
+    border: 2px solid rgba(74,158,255,0.3); border-top-color: #4a9eff;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: middle; box-sizing: border-box;
+  }
+  /* Muted static ring for pending/waiting state — no animation */
+  .spin-ring--pending {
+    border-color: rgba(130,130,130,0.2); border-top-color: #555;
+    animation: none;
+  }
+
+  /* Lightbox trim panel */
+  #lb-trim {
+    display: none; position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 10px 20px 14px;
+    background: rgba(8,8,8,0.88); backdrop-filter: blur(4px);
+  }
+  #lightbox.trimming #lb-trim { display: block; }
+  #lightbox.trimming #lb-vid { max-height: 72vh; margin-bottom: 96px; }
+  #lb-trim-timeline {
+    position: relative; height: 28px; background: #2a2a2a;
+    border-radius: 4px; margin-bottom: 8px;
+    cursor: pointer; user-select: none;
+  }
+  #lb-trim-track {
+    position: absolute; top: 0; bottom: 0;
+    background: rgba(74,158,255,0.38); pointer-events: none;
+  }
+  .lb-trim-handle {
+    position: absolute; top: -3px; bottom: -3px; width: 8px;
+    background: #4a9eff; border-radius: 3px;
+    cursor: ew-resize; transform: translateX(-50%); z-index: 2;
+    touch-action: none;
+  }
+  #lb-trim-playhead {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: rgba(255,255,255,0.65);
+    pointer-events: none; transform: translateX(-50%); z-index: 1;
+  }
+  #lb-trim-row {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.75rem; color: #aaa;
+  }
+  #lb-trim-row b { color: #eee; }
+  .lb-tbtn {
+    background: #242424; border: 1px solid #444; border-radius: 4px;
+    color: #ccc; font-size: 0.7rem; padding: 3px 8px; cursor: pointer;
+  }
+  .lb-tbtn:hover { background: #333; }
+  #lb-trim-save {
+    margin-left: auto; background: #0d2a45;
+    border-color: #2d7abf; color: #5aadff;
+  }
+  #lb-trim-save:hover:not(:disabled) { background: #0f3457; }
+  #lb-trim-save:disabled { opacity: 0.35; cursor: default; }
+
+  /* Library header */
+  #lib-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  #count { color: #666; font-size: 0.85rem; }
+  #btn-select-all {
+    padding: 3px 10px;
+    border-radius: 5px;
+    border: 1px solid #333;
+    background: #1e1e1e;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.78rem;
+    display: none;
+  }
+  #btn-select-all:hover { background: #2a2a2a; color: #eee; }
+
+  /* Checkboxes on thumbs */
+  .thumb .cb {
+    position: absolute;
+    top: 8px; left: 8px;
+    width: 20px; height: 20px;
+    cursor: pointer;
+    accent-color: #4a9eff;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 2;
+  }
+  .thumb:hover .cb,
+  .thumb.selected .cb { opacity: 1; }
+  .thumb.selected { outline: 2px solid #4a9eff; outline-offset: -2px; }
+  .thumb.selected::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(74,158,255,0.12);
+    pointer-events: none;
+  }
+
+  /* Fixed action bar */
+  #action-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #16213e;
+    border-top: 1px solid #2a2a4a;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transform: translateY(100%);
+    transition: transform 0.2s ease;
+    z-index: 100;
+  }
+  #action-bar.visible { transform: translateY(0); }
+  #sel-count { flex: 1; font-size: 0.9rem; color: #ccc; }
+  #action-bar button {
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background: #222;
+    color: #eee;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  #action-bar button:hover { background: #333; }
+  #btn-delete-sel { background: #5c1a1a !important; border-color: #8b2020 !important; color: #ffaaaa !important; }
+  #btn-delete-sel:hover { background: #7a2020 !important; }
+
+  /* Lightbox */
+  #lightbox {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.93);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    cursor: zoom-out;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox img, #lightbox video {
+    max-width: 95vw;
+    max-height: 92vh;
+    object-fit: contain;
+    border-radius: 4px;
+    cursor: default;
+  }
+  #lightbox-close {
+    position: absolute;
+    top: 14px; right: 20px;
+    color: #fff;
+    font-size: 2rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.6;
+    line-height: 1;
+  }
+  #lightbox-close:hover { opacity: 1; }
+  #lightbox-name {
+    position: absolute;
+    bottom: 16px; left: 0; right: 0;
+    text-align: center;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.78rem;
+  }
+
+  #lb-show-slideshow {
+    position: absolute;
+    top: 16px; left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 20px;
+    background: rgba(0, 150, 255, 0.9);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    z-index: 1002;
+    transition: background 0.2s;
+  }
+  #lb-show-slideshow:hover {
+    background: rgba(0, 180, 255, 1);
+  }
+  #lightbox.trimming #lb-show-slideshow {
+    display: none;
+  }
+
+  /* ── Toolbar ── */
+  #toolbar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-bottom: 14px; padding: 8px 12px;
+    background: #1a1a1a; border-radius: 8px; border: 1px solid #252525;
+  }
+  #sort-controls { display: flex; align-items: center; gap: 6px; }
+  #sort-controls label { font-size: 0.78rem; color: #666; }
+  #sort-by {
+    background: #252525; border: 1px solid #3a3a3a; color: #ccc;
+    font-size: 0.8rem; padding: 4px 8px; border-radius: 5px; cursor: pointer; outline: none;
+  }
+  #sort-by:hover { background: #333; border-color: #555; }
+  #sort-dir {
+    background: #252525; border: 1px solid #3a3a3a; color: #ccc;
+    font-size: 0.9rem; width: 28px; height: 26px; border-radius: 5px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  #sort-dir:hover { background: #333; border-color: #555; }
+  #group-label {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.8rem; color: #888; cursor: pointer; user-select: none;
+  }
+  #group-label input { accent-color: #4a9eff; cursor: pointer; margin: 0; }
+  #view-toggle { margin-left: auto; display: flex; gap: 4px; }
+  #view-toggle button {
+    background: #252525; border: 1px solid #3a3a3a; color: #777;
+    font-size: 1.1rem; width: 30px; height: 26px; border-radius: 5px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #view-toggle button.active { background: #0d2a45; border-color: #2d7abf; color: #5aadff; }
+  #view-toggle button:hover:not(.active) { background: #333; color: #ccc; }
+
+  /* ── Section headers (grouped view) ── */
+  .section-header {
+    grid-column: 1 / -1;
+    font-size: 0.72rem; font-weight: 600; color: #555;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 10px 0 4px; border-top: 1px solid #1f1f1f; margin-top: 4px;
+  }
+  .section-header:first-child { border-top: none; margin-top: 0; }
+
+  /* ── List view ── */
+  body.view-list #grid { display: flex; flex-direction: column; gap: 2px; }
+  body.view-list .section-header { grid-column: unset; padding: 10px 0 4px; }
+  .list-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 5px 8px; border-radius: 6px;
+    background: #161616; border: 1px solid transparent; cursor: pointer;
+  }
+  .list-row:hover { background: #1e1e1e; border-color: #2a2a2a; }
+  .list-row.selected { background: #0a1e36; border-color: #1e4a7a; }
+  .list-row .lr-thumb {
+    width: 52px; height: 52px; border-radius: 4px;
+    object-fit: cover; flex-shrink: 0; background: #222; display: block;
+  }
+  .list-row .lr-cb { flex-shrink: 0; accent-color: #4a9eff; cursor: pointer; margin: 0; }
+  .list-row .lr-names { flex: 1; min-width: 0; }
+  .list-row .lr-display-name {
+    display: block; font-size: 0.82rem; color: #ddd;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .list-row .lr-filename {
+    display: block; font-size: 0.63rem; color: #484848;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;
+  }
+  .list-row .lr-type {
+    flex-shrink: 0; font-size: 0.62rem; color: #777;
+    background: #252525; padding: 2px 6px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .list-row .lr-date { flex-shrink: 0; font-size: 0.72rem; color: #555; width: 84px; text-align: right; }
+  .list-row .lr-size { flex-shrink: 0; font-size: 0.72rem; color: #484848; width: 58px; text-align: right; }
+  .list-row .lr-del {
+    flex-shrink: 0; background: none; border: none; color: #444;
+    font-size: 1.1rem; cursor: pointer; padding: 4px 6px; border-radius: 4px; line-height: 1;
+  }
+  .list-row .lr-del:hover { background: #c0392b; color: #fff; }
+
+  /* ── Settings panel ─────────────────────────────────────────────────────── */
+  #btn-settings {
+    background: #252525; border: 1px solid #333; color: #888;
+    font-size: 1rem; padding: 4px 10px; border-radius: 6px;
+    cursor: pointer; margin-left: auto;
+  }
+  #btn-settings:hover { background: #333; color: #ccc; }
+
+  #settings-panel {
+    display: none;
+    background: #141414;
+    border: 1px solid #252525;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+  #settings-panel.open { display: block; }
+  #settings-panel h3 {
+    font-size: 0.78rem; font-weight: 600; color: #666;
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px;
+  }
+  .sp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
+  .sp-row { display: flex; flex-direction: column; gap: 5px; }
+  .sp-row label { font-size: 0.75rem; color: #666; }
+  .sp-row select, .sp-row input[type=number], .sp-row input[type=range] {
+    background: #252525; border: 1px solid #333; color: #ccc;
+    font-size: 0.82rem; padding: 5px 8px; border-radius: 5px;
+    outline: none; width: 100%;
+  }
+  .sp-row select:focus, .sp-row input[type=number]:focus { border-color: #4a9eff; }
+  .sp-interval-wrap { display: flex; align-items: center; gap: 6px; }
+  .sp-interval-wrap input[type=range] { flex: 1; padding: 0; }
+  .sp-interval-val { font-size: 0.75rem; color: #555; min-width: 32px; }
+
+  /* Toggle */
+  .sp-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .sp-toggle { position: relative; width: 38px; height: 21px; flex-shrink: 0; }
+  .sp-toggle input { opacity: 0; width: 0; height: 0; }
+  .sp-toggle-track {
+    position: absolute; inset: 0; background: #333;
+    border-radius: 11px; cursor: pointer; transition: background 0.2s;
+  }
+  .sp-toggle input:checked + .sp-toggle-track { background: #2d7abf; }
+  .sp-toggle-track::after {
+    content: ''; position: absolute;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #fff; top: 3px; left: 3px; transition: transform 0.2s;
+  }
+  .sp-toggle input:checked + .sp-toggle-track::after { transform: translateX(17px); }
+
+  .sp-actions { display: flex; gap: 10px; margin-top: 16px; align-items: center; }
+  #sp-save {
+    background: #1a3a5c; border: 1px solid #2d6aa0; color: #7bc4ff;
+    font-size: 0.82rem; padding: 6px 18px; border-radius: 6px; cursor: pointer;
+  }
+  #sp-save:hover { background: #1e4a7a; }
+  #sp-status { font-size: 0.75rem; color: #555; }
+
+  /* HA connection sub-section */
+  #ha-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid #1f1f1f; }
+  #ha-section h4 { font-size: 0.72rem; color: #555; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; }
+  .ha-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .ha-row label { font-size: 0.75rem; color: #555; min-width: 46px; }
+  .ha-row input {
+    flex: 1; background: #1e1e1e; border: 1px solid #2a2a2a; color: #aaa;
+    font-size: 0.78rem; padding: 5px 8px; border-radius: 5px; outline: none;
+  }
+  .ha-row input:focus { border-color: #4a9eff; }
+  #ha-save {
+    background: #252525; border: 1px solid #333; color: #888;
+    font-size: 0.78rem; padding: 5px 14px; border-radius: 5px; cursor: pointer;
+  }
+  #ha-save:hover { background: #2d7abf; border-color: #4a9eff; color: #fff; }
+  #ha-status { font-size: 0.72rem; color: #555; }
+
+  /* Upload toggle */
+  #upload-toggle { 
+    background: #252525; border: 1px solid #333; color: #888; 
+    padding: 8px 16px; border-radius: 6px; cursor: pointer; 
+    font-size: 0.85rem; margin-bottom: 16px; transition: all 0.2s;
+  }
+  #upload-toggle:hover { background: #2d7abf; border-color: #4a9eff; color: #fff; }
+  #upload-toggle.collapsed::before { content: '▶ '; }
+  #upload-toggle:not(.collapsed)::before { content: '▼ '; }
+  
+  #upload-container { transition: max-height 0.3s ease, opacity 0.3s ease; overflow: hidden; }
+  #upload-container.collapsed { max-height: 0; opacity: 0; pointer-events: none; }
+  #upload-container:not(.collapsed) { max-height: 800px; opacity: 1; }
+
+  /* Mobile-friendly styles */
+  @media (max-width: 768px) {
+    body { padding: 16px 12px 60px; }
+    h1 { font-size: 1.2rem; margin-bottom: 14px; }
+    
+    /* Sticky toolbar */
+    #toolbar {
+      position: sticky;
+      top: -1px;
+      z-index: 100;
+      background: #111;
+      padding: 10px 0;
+      margin: 0 -12px 16px;
+      padding-left: 12px;
+      padding-right: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    
+    /* Bigger touch targets */
+    #dropzone { padding: 32px 20px; }
+    #dropzone p { font-size: 1.1rem; }
+    
+    #toolbar select, #toolbar button { 
+      font-size: 1rem; 
+      padding: 10px 14px;
+      min-height: 44px;
+    }
+    
+    #sort-controls { gap: 10px; }
+    #sort-dir { min-width: 44px; font-size: 1.2rem; }
+    
+    #group-label { 
+      font-size: 0.95rem;
+      padding: 10px;
+      cursor: pointer;
+    }
+    #group-label input[type=checkbox] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    
+    #view-toggle button {
+      font-size: 1.3rem;
+      min-width: 44px;
+      min-height: 44px;
+    }
+    
+    #lib-header button {
+      font-size: 0.95rem;
+      padding: 10px 16px;
+      min-height: 44px;
+    }
+    
+    #btn-settings { font-size: 1.1rem; }
+    
+    /* Grid adjustments */
+    #grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+    
+    .thumb .del {
+      width: 32px;
+      height: 32px;
+      font-size: 1.3rem;
+    }
+    
+    .thumb .cb {
+      width: 24px;
+      height: 24px;
+    }
+    
+    /* Settings panel */
+    #settings-panel {
+      left: 0;
+      right: 0;
+      width: 100%;
+      max-width: 100%;
+      border-radius: 0;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    
+    .sp-row label, .sp-row select, .sp-row input {
+      font-size: 0.95rem;
+    }
+    
+    #sp-save, #ha-save {
+      font-size: 0.95rem;
+      padding: 10px 20px;
+      min-height: 44px;
+    }
+    
+    /* Lightbox adjustments */
+    #lightbox-close {
+      width: 44px;
+      height: 44px;
+      font-size: 2rem;
+    }
+    
+    #lb-show-slideshow {
+      font-size: 1rem;
+      padding: 12px 24px;
+      min-height: 44px;
+    }
+  }
+</style>
+</head>
+<body>
+<h1>Slideshow Manager</h1>
+
+<button id="upload-toggle">Upload & Processing</button>
+
+<div id="upload-container">
+<div id="dropzone">
+  <p>Drop photos or videos here, or click to select</p>
+  <small>JPEG · PNG · GIF · WebP · MP4 · MOV · WebM &bull; up to 1 GB each &bull; re-uploading overwrites</small>
+  <input type="file" id="fileInput" multiple accept="image/*,video/*">
+</div>
+
+<div id="progress">
+  <div id="progressBar"><div id="progressFill"></div></div>
+  <div id="progressLabel"></div>
+</div>
+
+<div id="failed-section">
+  <h3>Upload failures — retry these files
+    <button id="failed-dismiss" onclick="document.getElementById('failed-section').style.display='none'">Dismiss ×</button>
+  </h3>
+  <div id="failed-list"></div>
+</div>
+
+<div id="queue-section" style="display:none">
+  <h2 id="queue-heading">Processing queue</h2>
+  <div id="queue-grid"></div>
+</div>
+</div> <!-- end upload-container -->
+
+<div id="lib-header">
+  <span id="count"></span>
+  <button id="btn-select-all">Select all</button>
+  <button id="btn-settings" title="Settings">⚙ Settings</button>
+</div>
+
+<div id="settings-panel">
+  <h3>Slideshow Settings</h3>
+  <div class="sp-grid">
+    <div class="sp-row">
+      <label>Interval (seconds)</label>
+      <div class="sp-interval-wrap">
+        <input type="range" id="sp-interval" min="3" max="120" step="1">
+        <span class="sp-interval-val" id="sp-interval-val">10s</span>
+      </div>
+    </div>
+    <div class="sp-row">
+      <label>Transition</label>
+      <select id="sp-transition">
+        <option value="random">Random</option>
+        <option value="crossfade">Crossfade</option>
+        <option value="slide_left">Slide left</option>
+        <option value="slide_right">Slide right</option>
+        <option value="slide_up">Slide up</option>
+        <option value="slide_down">Slide down</option>
+        <option value="zoom_in">Zoom in</option>
+        <option value="zoom_out">Zoom out</option>
+        <option value="fade_black">Fade through black</option>
+        <option value="wipe">Wipe</option>
+        <option value="curtain">Curtain</option>
+        <option value="rotate_fade">Rotate &amp; fade</option>
+        <option value="flip_h">Flip</option>
+        <option value="barn_doors">Barn doors</option>
+        <option value="blinds">Blinds</option>
+        <option value="iris">Circle iris</option>
+        <option value="diagonal_wipe">Diagonal wipe</option>
+        <option value="clock_wipe">Clock wipe</option>
+        <option value="pixelate">Pixelate</option>
+        <option value="ripple">Ripple</option>
+        <option value="glitch">Glitch</option>
+        <option value="mosaic">Mosaic</option>
+        <option value="shatter">Shatter</option>
+        <option value="paint_brush">Paint brush</option>
+        <option value="none">None</option>
+      </select>
+    </div>
+    <div class="sp-row">
+      <label>Order</label>
+      <select id="sp-order">
+        <option value="random">Random</option>
+        <option value="sequential">Sequential</option>
+      </select>
+    </div>
+    <div class="sp-row">
+      <label>Fit</label>
+      <select id="sp-fit">
+        <option value="cover">Cover (fill)</option>
+        <option value="contain">Contain (letterbox)</option>
+      </select>
+    </div>
+    <div class="sp-row">
+      <label>&nbsp;</label>
+      <div class="sp-toggle-row">
+        <span style="font-size:0.8rem;color:#888">Ken Burns effect</span>
+        <label class="sp-toggle">
+          <input type="checkbox" id="sp-kenburns">
+          <div class="sp-toggle-track"></div>
+        </label>
+      </div>
+    </div>
+  </div>
+  <div class="sp-actions">
+    <button id="sp-save">Save &amp; sync</button>
+    <span id="sp-status"></span>
+  </div>
+
+  <div id="ha-section">
+    <h4>Home Assistant connection</h4>
+    <div class="ha-row">
+      <label>URL</label>
+      <input type="text" id="ha-url" placeholder="http://192.168.68.140:8123">
+    </div>
+    <div class="ha-row">
+      <label>Token</label>
+      <input type="password" id="ha-token" placeholder="Long-lived access token">
+    </div>
+    <div class="ha-row" style="margin-bottom:0">
+      <button id="ha-save">Save</button>
+      <span id="ha-status"></span>
+    </div>
+  </div>
+</div>
+<div id="toolbar">
+  <div id="sort-controls">
+    <label>Sort:</label>
+    <select id="sort-by">
+      <option value="name">Name</option>
+      <option value="filename">Filename</option>
+      <option value="date">Date</option>
+      <option value="type">Type</option>
+    </select>
+    <button id="sort-dir" title="Toggle sort direction">↑</button>
+  </div>
+  <label id="group-label"><input type="checkbox" id="chk-group"> Group by type</label>
+  <div id="view-toggle">
+    <button id="btn-view-grid" class="active" title="Grid view">⊞</button>
+    <button id="btn-view-list" title="List view">☰</button>
+  </div>
+</div>
+<div id="marquee"></div>
+<div id="grid"></div>
+<div id="empty-msg">No media yet. Drop some above to get started.</div>
+
+<div id="lightbox">
+  <button id="lightbox-close">×</button>
+  <img id="lb-img" src="" alt="">
+  <video id="lb-vid" controls autoplay muted playsinline></video>
+  <div id="lightbox-name"></div>
+  <button id="lb-show-slideshow" title="Show this image on the slideshow">▶ Show on Slideshow</button>
+  <div id="lb-trim">
+    <div id="lb-trim-timeline">
+      <div id="lb-trim-track"></div>
+      <div class="lb-trim-handle" id="lb-handle-start"></div>
+      <div class="lb-trim-handle" id="lb-handle-end"></div>
+      <div id="lb-trim-playhead"></div>
+    </div>
+    <div id="lb-trim-row">
+      <span>Start: <b id="lb-t-start">0:00.0</b></span>
+      <button class="lb-tbtn" id="lb-set-start" title="Set start to current position">◄ Here</button>
+      <span style="margin-left:8px">End: <b id="lb-t-end">0:00.0</b></span>
+      <button class="lb-tbtn" id="lb-set-end" title="Set end to current position">Here ►</button>
+      <button class="lb-tbtn" id="lb-trim-save" disabled>Trim &amp; Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="action-bar">
+  <span id="sel-count">0 selected</span>
+  <button id="btn-deselect">Deselect all</button>
+  <button id="btn-delete-sel">Delete selected</button>
+</div>
+
+<script>
+  const VIDEO_RE = /\.mp4$/i
+
+  const dropzone      = document.getElementById('dropzone')
+  const fileInput     = document.getElementById('fileInput')
+  const grid          = document.getElementById('grid')
+  const progress      = document.getElementById('progress')
+  const progressFill  = document.getElementById('progressFill')
+  const progressLabel = document.getElementById('progressLabel')
+  const countEl       = document.getElementById('count')
+  const emptyMsg      = document.getElementById('empty-msg')
+  const queueSection  = document.getElementById('queue-section')
+  const queueGrid     = document.getElementById('queue-grid')
+  const queueHeading  = document.getElementById('queue-heading')
+  const actionBar     = document.getElementById('action-bar')
+  const selCountEl    = document.getElementById('sel-count')
+  const btnSelectAll  = document.getElementById('btn-select-all')
+  const btnDeselect   = document.getElementById('btn-deselect')
+  const btnDeleteSel  = document.getElementById('btn-delete-sel')
+  const marqueeEl     = document.getElementById('marquee')
+
+  // ── Upload toggle ─────────────────────────────────────────────────────────
+  const uploadToggle = document.getElementById('upload-toggle')
+  const uploadContainer = document.getElementById('upload-container')
+  
+  // Load saved upload visibility state
+  const uploadCollapsed = localStorage.getItem('uploadCollapsed') === 'true'
+  if (uploadCollapsed) {
+    uploadToggle.classList.add('collapsed')
+    uploadContainer.classList.add('collapsed')
+  }
+  
+  uploadToggle.addEventListener('click', () => {
+    const isCollapsed = uploadToggle.classList.toggle('collapsed')
+    uploadContainer.classList.toggle('collapsed')
+    localStorage.setItem('uploadCollapsed', isCollapsed)
+  })
+
+  // ── Sort / view state ─────────────────────────────────────────────────────
+  let sortBy      = 'name'   // 'name' | 'filename' | 'date' | 'type'
+  let sortDir     = 1        // 1 = asc, -1 = desc
+  let groupByType = false
+  let viewMode    = 'grid'   // 'grid' | 'list'
+
+  const sortByEl    = document.getElementById('sort-by')
+  const sortDirBtn  = document.getElementById('sort-dir')
+  const chkGroup    = document.getElementById('chk-group')
+  const btnViewGrid = document.getElementById('btn-view-grid')
+  const btnViewList = document.getElementById('btn-view-list')
+
+  // Load saved settings from localStorage
+  try {
+    const saved = JSON.parse(localStorage.getItem('manageSettings') || '{}')
+    if (saved.sortBy) sortBy = saved.sortBy
+    if (saved.sortDir) sortDir = saved.sortDir
+    if (saved.groupByType !== undefined) groupByType = saved.groupByType
+    if (saved.viewMode) viewMode = saved.viewMode
+    
+    // Apply to UI
+    sortByEl.value = sortBy
+    sortDirBtn.textContent = sortDir === 1 ? '↑' : '↓'
+    chkGroup.checked = groupByType
+    if (viewMode === 'list') {
+      btnViewList.classList.add('active')
+      btnViewGrid.classList.remove('active')
+    } else {
+      btnViewGrid.classList.add('active')
+      btnViewList.classList.remove('active')
+    }
+  } catch (e) { console.error('Failed to load settings:', e) }
+
+  // Save settings to localStorage
+  function saveSettings() {
+    try {
+      localStorage.setItem('manageSettings', JSON.stringify({ sortBy, sortDir, groupByType, viewMode }))
+    } catch (e) { console.error('Failed to save settings:', e) }
+  }
+
+  sortByEl.addEventListener('change', () => { sortBy = sortByEl.value; saveSettings(); renderGrid() })
+  sortDirBtn.addEventListener('click', () => {
+    sortDir *= -1
+    sortDirBtn.textContent = sortDir === 1 ? '↑' : '↓'
+    saveSettings()
+    renderGrid()
+  })
+  chkGroup.addEventListener('change', () => { groupByType = chkGroup.checked; saveSettings(); renderGrid() })
+  btnViewGrid.addEventListener('click', () => {
+    viewMode = 'grid'
+    btnViewGrid.classList.add('active'); btnViewList.classList.remove('active')
+    saveSettings()
+    renderGrid()
+  })
+  btnViewList.addEventListener('click', () => {
+    viewMode = 'list'
+    btnViewList.classList.add('active'); btnViewGrid.classList.remove('active')
+    saveSettings()
+    renderGrid()
+  })
+
+  // ── Marquee (rubber-band) selection ──────────────────────────────────────
+  let dragStart = null, dragging = false, wasDragging = false
+
+  grid.addEventListener('mousedown', e => {
+    if (e.button !== 0) return
+    if (e.target.closest('.del, .cb, .display-name, .name-input')) return
+    dragStart = { x: e.clientX, y: e.clientY }
+  })
+
+  document.addEventListener('mousemove', e => {
+    if (!dragStart) return
+    if (!dragging && Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) < 5) return
+    dragging = true
+    e.preventDefault()
+    document.body.classList.add('is-marquee-dragging')
+    const x1 = Math.min(dragStart.x, e.clientX)
+    const y1 = Math.min(dragStart.y, e.clientY)
+    marqueeEl.style.cssText = `display:block;left:${x1}px;top:${y1}px;` +
+      `width:${Math.abs(e.clientX - dragStart.x)}px;height:${Math.abs(e.clientY - dragStart.y)}px`
+  }, { passive: false })
+
+  document.addEventListener('mouseup', e => {
+    if (!dragStart) return
+    document.body.classList.remove('is-marquee-dragging')
+    marqueeEl.style.display = 'none'
+    if (dragging) {
+      const x1 = Math.min(dragStart.x, e.clientX)
+      const y1 = Math.min(dragStart.y, e.clientY)
+      const x2 = Math.max(dragStart.x, e.clientX)
+      const y2 = Math.max(dragStart.y, e.clientY)
+      document.querySelectorAll('#grid .thumb, #grid .list-row').forEach(thumb => {
+        const r = thumb.getBoundingClientRect()
+        if (r.left < x2 && r.right > x1 && r.top < y2 && r.bottom > y1) {
+          const tname = thumb.dataset.name
+          if (!tname) return
+          const tcb = thumb.querySelector('.cb, .lr-cb')
+          selectedSet.add(tname)
+          thumb.classList.add('selected')
+          if (tcb) tcb.checked = true
+        }
+      })
+      updateSelectionUI()
+      wasDragging = true
+      setTimeout(() => { wasDragging = false }, 0)
+    }
+    dragStart = null
+    dragging = false
+  })
+
+  // ── Upload ────────────────────────────────────────────────────────────────
+
+  dropzone.addEventListener('click', () => fileInput.click())
+  fileInput.addEventListener('change', () => uploadFiles(fileInput.files))
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over') })
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'))
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault()
+    dropzone.classList.remove('over')
+    uploadFiles(e.dataTransfer.files)
+  })
+
+  const BATCH_SIZE = 20
+
+  async function uploadFiles(files) {
+    if (!files.length) return
+    const all = Array.from(files)
+    const batches = []
+    for (let i = 0; i < all.length; i += BATCH_SIZE) batches.push(all.slice(i, i + BATCH_SIZE))
+
+    progress.style.display = 'block'
+    progressFill.style.width = '0%'
+    progressLabel.textContent = `Uploading ${all.length} file${all.length > 1 ? 's' : ''}…`
+
+    const totalBytes = all.reduce((s, f) => s + f.size, 0)
+    let batchBase = 0   // bytes in completed batches
+    const failedFiles = []  // names of files whose batch failed
+    let succeeded = 0
+
+    const failedSection = document.getElementById('failed-section')
+    const failedList    = document.getElementById('failed-list')
+    failedSection.style.display = 'none'
+    failedList.innerHTML = ''
+
+    for (let b = 0; b < batches.length; b++) {
+      const batch = batches[b]
+      const batchBytes = batch.reduce((s, f) => s + f.size, 0)
+      const form = new FormData()
+      for (const f of batch) form.append('photos', f)
+
+      progressLabel.textContent = batches.length > 1
+        ? `Uploading batch ${b + 1} of ${batches.length} (${all.length} files total)…`
+        : `Uploading ${all.length} file${all.length > 1 ? 's' : ''}…`
+
+      let respText
+      try {
+        respText = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+          xhr.open('POST', '/upload')
+          xhr.upload.onprogress = e => {
+            if (e.lengthComputable && totalBytes > 0) {
+              const pct = Math.round((batchBase + e.loaded) / totalBytes * 100)
+              progressFill.style.width = pct + '%'
+            }
+          }
+          xhr.onload = () => xhr.status < 300
+            ? resolve(xhr.responseText)
+            : reject(new Error(`Server error ${xhr.status}: ${xhr.responseText.slice(0, 200)}`))
+          xhr.onerror = () => reject(new Error('Network error — connection lost'))
+          xhr.ontimeout = () => reject(new Error('Upload timed out'))
+          xhr.send(form)
+        })
+      } catch (e) {
+        // Record which files were in this failed batch; continue with remaining batches
+        for (const f of batch) failedFiles.push(f.name)
+        batchBase += batchBytes
+        progressLabel.textContent = `Batch ${b + 1} failed (${e.message}) — continuing…`
+        continue
+      }
+
+      batchBase += batchBytes
+      progressFill.style.width = Math.round(batchBase / totalBytes * 100) + '%'
+      succeeded += batch.length
+
+      try {
+        const json = JSON.parse(respText)
+        if (json.files) { renderQueueFromUpload(json.files); startQueuePolling() }
+      } catch {}
+    }
+
+    progressFill.style.width = '100%'
+
+    if (failedFiles.length > 0) {
+      // Show which files need to be retried
+      failedList.innerHTML = failedFiles.map(n => `<div>${n}</div>`).join('')
+      failedSection.style.display = 'block'
+      progressLabel.textContent = succeeded > 0
+        ? `${succeeded} file${succeeded > 1 ? 's' : ''} queued — ${failedFiles.length} failed (see below)`
+        : `All batches failed — ${failedFiles.length} file${failedFiles.length > 1 ? 's' : ''} need retrying`
+      setTimeout(() => { progress.style.display = 'none' }, 5000)
+    } else {
+      progressLabel.textContent = `Uploaded ${all.length} file${all.length > 1 ? 's' : ''} — queued for processing`
+      setTimeout(() => { progress.style.display = 'none' }, 3000)
+    }
+  }
+
+  // ── Multi-select ──────────────────────────────────────────────────────────
+
+  function renderQueueFromUpload(files) {
+    for (const f of files.filter(f => f.queued)) {
+      localQueue.set(f.queueId, {
+        id: f.queueId, name: f.outputName,
+        thumbName: f.outputName.replace(/\.[^.]+$/, '') + '_thumb.jpg',
+        status: 'pending', progress: null
+      })
+    }
+    renderQueue()
+  }
+
+  const selectedSet = new Set()
+  let allFiles  = []
+  let metaData  = {}
+
+  function updateSelectionUI() {
+    const n = selectedSet.size
+    actionBar.classList.toggle('visible', n > 0)
+    selCountEl.textContent = n === 1 ? '1 item selected' : `${n} items selected`
+  }
+
+  btnSelectAll.addEventListener('click', () => {
+    allFiles.forEach(f => selectedSet.add(f.name))
+    document.querySelectorAll('#grid .thumb, #grid .list-row').forEach(t => {
+      t.classList.add('selected')
+      const cb = t.querySelector('.cb, .lr-cb')
+      if (cb) cb.checked = true
+    })
+    updateSelectionUI()
+  })
+
+  btnDeselect.addEventListener('click', () => {
+    selectedSet.clear()
+    document.querySelectorAll('#grid .thumb, #grid .list-row').forEach(t => {
+      t.classList.remove('selected')
+      const cb = t.querySelector('.cb, .lr-cb')
+      if (cb) cb.checked = false
+    })
+    updateSelectionUI()
+  })
+
+  btnDeleteSel.addEventListener('click', async () => {
+    const names = [...selectedSet]
+    if (!names.length) return
+    if (!confirm(`Permanently delete ${names.length} item${names.length > 1 ? 's' : ''}?`)) return
+    await Promise.all(names.map(name =>
+      fetch('/api/photos/' + encodeURIComponent(name), { method: 'DELETE' })
+    ))
+    selectedSet.clear()
+    updateSelectionUI()
+    loadMedia()
+  })
+
+  function toggleSelect(name, div, cb) {
+    if (selectedSet.has(name)) {
+      selectedSet.delete(name); div.classList.remove('selected'); cb.checked = false
+    } else {
+      selectedSet.add(name); div.classList.add('selected'); cb.checked = true
+    }
+    updateSelectionUI()
+  }
+
+  function makeThumb(name, size, displayName, date) {
+    const isVid = VIDEO_RE.test(name)
+    const div = document.createElement('div')
+    div.className = 'thumb' + (selectedSet.has(name) ? ' selected' : '')
+    div.dataset.name = name
+
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'; cb.className = 'cb'; cb.checked = selectedSet.has(name)
+    cb.addEventListener('change', e => { e.stopPropagation(); toggleSelect(name, div, cb) })
+
+    if (isVid) {
+      const v = document.createElement('video')
+      v.src = '/photos/' + encodeURIComponent(name)
+      v.preload = 'metadata'; v.muted = true; v.playsInline = true
+      // Seek to first frame so the browser paints a thumbnail immediately
+      v.addEventListener('loadedmetadata', () => {
+        v.currentTime = 0.001
+        const r = v.videoWidth / (v.videoHeight || 1)
+        orientBadge.classList.add(r < 0.9 ? 'portrait' : r > 1.1 ? 'landscape' : 'square')
+      })
+      div.appendChild(v)
+      const badge = document.createElement('div')
+      badge.className = 'video-badge'; badge.textContent = '▶ VIDEO'
+      div.appendChild(badge)
+    } else {
+      const img = document.createElement('img')
+      img.src = '/photos/' + encodeURIComponent(name)
+      img.loading = 'lazy'; img.alt = name
+      img.addEventListener('load', () => {
+        const r = img.naturalWidth / (img.naturalHeight || 1)
+        orientBadge.classList.add(r < 0.9 ? 'portrait' : r > 1.1 ? 'landscape' : 'square')
+      })
+      div.appendChild(img)
+    }
+
+    const orientBadge = document.createElement('div')
+    orientBadge.className = 'orient-badge'
+    div.appendChild(orientBadge)
+
+    div.addEventListener('click', e => {
+      if (wasDragging) return
+      if (e.target.classList.contains('del') || e.target === cb ||
+          e.target.classList.contains('display-name') || e.target.classList.contains('name-input')) return
+      toggleSelect(name, div, cb)
+    })
+    div.addEventListener('dblclick', e => { e.stopPropagation(); openLightbox(name) })
+
+    const btn = document.createElement('button')
+    btn.className = 'del'; btn.title = 'Delete'; btn.textContent = '×'
+    btn.addEventListener('click', async e => {
+      e.stopPropagation()
+      if (!confirm(`Delete "${name}"?`)) return
+      await fetch('/api/photos/' + encodeURIComponent(name), { method: 'DELETE' })
+      selectedSet.delete(name); updateSelectionUI(); loadMedia()
+    })
+
+    const infoBar = document.createElement('div')
+    infoBar.className = 'info-bar'
+
+    const label = document.createElement('span')
+    label.className = 'display-name'
+    label.title = 'Click to rename'
+    label.textContent = displayName || name.replace(/\.[^.]+$/, '')
+    label.addEventListener('click', e => { e.stopPropagation(); startRename(name, label) })
+
+    const sizeEl = document.createElement('span')
+    sizeEl.className = 'file-size'
+    sizeEl.textContent = size != null ? (size / 1024 / 1024).toFixed(1) + ' MB' : ''
+
+    infoBar.append(label, sizeEl)
+    if (date) {
+      const dateEl = document.createElement('span')
+      dateEl.className = 'photo-date'
+      dateEl.textContent = date
+      infoBar.appendChild(dateEl)
+    }
+    div.append(cb, btn, infoBar)
+    return div
+  }
+
+  function startRename(filename, label) {
+    const prev  = label.textContent
+    const input = document.createElement('input')
+    input.type = 'text'; input.className = 'name-input'; input.value = prev
+    label.replaceWith(input)
+    input.focus(); input.select()
+    let saved = false
+    const finish = async () => {
+      if (saved) return; saved = true
+      const val = input.value.trim() || prev
+      input.replaceWith(label); label.textContent = val
+      if (val !== prev) {
+        await fetch('/api/meta/' + encodeURIComponent(filename), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ displayName: val })
+        })
+        metaData[filename] = { ...metaData[filename], displayName: val }
+      }
+    }
+    input.addEventListener('blur', finish)
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); input.blur() }
+      if (e.key === 'Escape') { input.value = prev; input.blur() }
+    })
+  }
+
+  async function loadMedia() {
+    const [photosRes, metaRes] = await Promise.all([fetch('/api/photos'), fetch('/api/meta')])
+    allFiles = await photosRes.json()
+    metaData = await metaRes.json()
+
+    const names = new Set(allFiles.map(f => f.name))
+    for (const name of [...selectedSet]) { if (!names.has(name)) selectedSet.delete(name) }
+    updateSelectionUI()
+    renderGrid()
+  }
+
+  function getSortedFiles(files) {
+    const getKey = f => {
+      switch (sortBy) {
+        case 'name':     return (metaData[f.name]?.displayName || f.name.replace(/\.[^.]+$/, '')).toLowerCase()
+        case 'filename': return f.name.toLowerCase()
+        case 'date':     return f.date || (sortDir === 1 ? '\uffff' : '')  // nulls last for asc, first for desc
+        case 'type':     return VIDEO_RE.test(f.name) ? '0' : '1'
+        default:         return f.name.toLowerCase()
+      }
+    }
+    return [...files].sort((a, b) => {
+      const ka = getKey(a), kb = getKey(b)
+      return ka < kb ? -sortDir : ka > kb ? sortDir : 0
+    })
+  }
+
+  function renderGrid() {
+    const n = allFiles.length
+    countEl.textContent = n ? `${n} file${n > 1 ? 's' : ''} in library` : ''
+    emptyMsg.style.display = n ? 'none' : 'block'
+    btnSelectAll.style.display = n ? 'block' : 'none'
+    grid.innerHTML = ''
+    document.body.classList.toggle('view-list', viewMode === 'list')
+
+    const maker = viewMode === 'list' ? makeListRow : makeThumb
+
+    if (groupByType) {
+      const images = allFiles.filter(f => !VIDEO_RE.test(f.name))
+      const videos = allFiles.filter(f =>  VIDEO_RE.test(f.name))
+      if (images.length) appendSection('Photos', getSortedFiles(images), maker)
+      if (videos.length) appendSection('Videos', getSortedFiles(videos), maker)
+    } else {
+      for (const f of getSortedFiles(allFiles)) {
+        grid.appendChild(maker(f.name, f.size, metaData[f.name]?.displayName, f.date))
+      }
+    }
+  }
+
+  function appendSection(label, files, maker) {
+    const hdr = document.createElement('div')
+    hdr.className = 'section-header'
+    hdr.textContent = `${label} (${files.length})`
+    grid.appendChild(hdr)
+    for (const f of files) {
+      grid.appendChild(maker(f.name, f.size, metaData[f.name]?.displayName, f.date))
+    }
+  }
+
+  function makeListRow(name, size, displayName, date) {
+    const isVid = VIDEO_RE.test(name)
+    const row = document.createElement('div')
+    row.className = 'list-row' + (selectedSet.has(name) ? ' selected' : '')
+    row.dataset.name = name
+
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'; cb.className = 'lr-cb'; cb.checked = selectedSet.has(name)
+    cb.addEventListener('change', e => { e.stopPropagation(); toggleSelect(name, row, cb) })
+
+    const thumbEl = isVid ? document.createElement('video') : document.createElement('img')
+    thumbEl.className = 'lr-thumb'
+    thumbEl.src = '/photos/' + encodeURIComponent(name)
+    if (isVid) { thumbEl.muted = true; thumbEl.preload = 'metadata'; thumbEl.playsInline = true
+      thumbEl.addEventListener('loadedmetadata', () => {
+        thumbEl.currentTime = 0.001
+        const r = thumbEl.videoWidth / (thumbEl.videoHeight || 1)
+        typeEl.textContent = (isVid ? 'video' : 'image') + ' · ' + (r < 0.9 ? 'portrait' : r > 1.1 ? 'landscape' : 'square')
+      })
+    }
+    else {
+      thumbEl.loading = 'lazy'; thumbEl.alt = name
+      thumbEl.addEventListener('load', () => {
+        const r = thumbEl.naturalWidth / (thumbEl.naturalHeight || 1)
+        typeEl.textContent = (isVid ? 'video' : 'image') + ' · ' + (r < 0.9 ? 'portrait' : r > 1.1 ? 'landscape' : 'square')
+      })
+    }
+
+    const namesCol = document.createElement('div')
+    namesCol.className = 'lr-names'
+    const dname = document.createElement('span')
+    dname.className = 'lr-display-name'
+    dname.textContent = displayName || name.replace(/\.[^.]+$/, '')
+    const fname = document.createElement('span')
+    fname.className = 'lr-filename'
+    fname.textContent = name
+    namesCol.append(dname, fname)
+
+    const typeEl = document.createElement('span')
+    typeEl.className = 'lr-type'
+    typeEl.textContent = isVid ? 'video' : 'image'
+
+    const dateEl = document.createElement('span')
+    dateEl.className = 'lr-date'
+    dateEl.textContent = date || '—'
+
+    const sizeEl = document.createElement('span')
+    sizeEl.className = 'lr-size'
+    sizeEl.textContent = size != null ? (size / 1024 / 1024).toFixed(1) + ' MB' : ''
+
+    const delBtn = document.createElement('button')
+    delBtn.className = 'lr-del'; delBtn.title = 'Delete'; delBtn.textContent = '×'
+    delBtn.addEventListener('click', async e => {
+      e.stopPropagation()
+      if (!confirm(`Delete "${name}"?`)) return
+      await fetch('/api/photos/' + encodeURIComponent(name), { method: 'DELETE' })
+      selectedSet.delete(name); updateSelectionUI(); loadMedia()
+    })
+
+    row.addEventListener('click', e => {
+      if (wasDragging) return
+      if (e.target === cb || e.target === delBtn) return
+      toggleSelect(name, row, cb)
+    })
+    row.addEventListener('dblclick', e => { e.stopPropagation(); openLightbox(name) })
+
+    row.append(cb, thumbEl, namesCol, typeEl, dateEl, sizeEl, delBtn)
+    return row
+  }
+
+  // ── Lightbox ──────────────────────────────────────────────────────────────
+
+  const lightbox  = document.getElementById('lightbox')
+  const lbImg     = document.getElementById('lb-img')
+  const lbVid     = document.getElementById('lb-vid')
+  const lbClose   = document.getElementById('lightbox-close')
+  const lbNameEl  = document.getElementById('lightbox-name')
+  const lbShowSlideshow = document.getElementById('lb-show-slideshow')
+  
+  let sentToSlideshow = false  // Track if we sent image to slideshow
+  const lbTrimPanel   = document.getElementById('lb-trim')
+  const lbTrimTimeline = document.getElementById('lb-trim-timeline')
+  const lbTrimTrack   = document.getElementById('lb-trim-track')
+  const lbHandleStart = document.getElementById('lb-handle-start')
+  const lbHandleEnd   = document.getElementById('lb-handle-end')
+  const lbTrimPlayhead = document.getElementById('lb-trim-playhead')
+  const lbTStart      = document.getElementById('lb-t-start')
+  const lbTEnd        = document.getElementById('lb-t-end')
+  const lbSetStart    = document.getElementById('lb-set-start')
+  const lbSetEnd      = document.getElementById('lb-set-end')
+  const lbTrimSave    = document.getElementById('lb-trim-save')
+
+  let trimStart = 0, trimEnd = 0, trimDuration = 0, trimFilename = ''
+  let draggingHandle = null
+
+  function fmtTime(s) {
+    const m = Math.floor(s / 60)
+    return m + ':' + String(Math.floor(s % 60)).padStart(2, '0') + '.' + String(Math.floor((s % 1) * 10))
+  }
+
+  function updateTrimUI() {
+    if (!trimDuration) return
+    const sp = trimStart / trimDuration * 100
+    const ep = trimEnd   / trimDuration * 100
+    lbHandleStart.style.left = sp + '%'
+    lbHandleEnd.style.left   = ep + '%'
+    lbTrimTrack.style.left   = sp + '%'
+    lbTrimTrack.style.width  = (ep - sp) + '%'
+    lbTStart.textContent = fmtTime(trimStart)
+    lbTEnd.textContent   = fmtTime(trimEnd)
+    const changed = trimStart > 0.05 || trimEnd < trimDuration - 0.05
+    lbTrimSave.disabled = !changed
+  }
+
+  function timelineClientX(e) {
+    return (e.touches ? e.touches[0] : e).clientX
+  }
+  function getTimelinePct(clientX) {
+    const r = lbTrimTimeline.getBoundingClientRect()
+    return Math.max(0, Math.min(100, (clientX - r.left) / r.width * 100))
+  }
+  function pctToTime(pct) { return pct / 100 * trimDuration }
+
+  lbVid.addEventListener('loadedmetadata', () => {
+    trimDuration = lbVid.duration
+    trimStart = 0; trimEnd = trimDuration
+    updateTrimUI()
+  })
+  lbVid.addEventListener('timeupdate', () => {
+    if (!trimDuration) return
+    lbTrimPlayhead.style.left = (lbVid.currentTime / trimDuration * 100) + '%'
+  })
+
+  lbSetStart.addEventListener('click', () => {
+    trimStart = Math.min(lbVid.currentTime, trimEnd - 0.5)
+    updateTrimUI()
+  })
+  lbSetEnd.addEventListener('click', () => {
+    trimEnd = Math.max(lbVid.currentTime, trimStart + 0.5)
+    updateTrimUI()
+  })
+
+  function startHandleDrag(which, e) {
+    e.stopPropagation()
+    e.preventDefault()
+    draggingHandle = which
+  }
+  lbHandleStart.addEventListener('mousedown',  e => startHandleDrag('start', e))
+  lbHandleEnd.addEventListener('mousedown',    e => startHandleDrag('end',   e))
+  lbHandleStart.addEventListener('touchstart', e => startHandleDrag('start', e), { passive: false })
+  lbHandleEnd.addEventListener('touchstart',   e => startHandleDrag('end',   e), { passive: false })
+
+  function onTrimMove(clientX) {
+    if (!draggingHandle || !trimDuration) return
+    const t = pctToTime(getTimelinePct(clientX))
+    if (draggingHandle === 'start') {
+      trimStart = Math.max(0, Math.min(t, trimEnd - 0.5))
+      lbVid.currentTime = trimStart
+    } else {
+      trimEnd = Math.min(trimDuration, Math.max(t, trimStart + 0.5))
+      lbVid.currentTime = trimEnd
+    }
+    updateTrimUI()
+  }
+  document.addEventListener('mousemove', e => { if (draggingHandle) { e.preventDefault(); onTrimMove(e.clientX) } }, { passive: false })
+  document.addEventListener('touchmove',  e => { if (draggingHandle) { e.preventDefault(); onTrimMove(e.touches[0].clientX) } }, { passive: false })
+  document.addEventListener('mouseup',  () => { draggingHandle = null })
+  document.addEventListener('touchend', () => { draggingHandle = null })
+
+  lbTrimTimeline.addEventListener('click', e => {
+    if (e.target === lbHandleStart || e.target === lbHandleEnd) return
+    lbVid.currentTime = pctToTime(getTimelinePct(e.clientX))
+  })
+
+  lbTrimSave.addEventListener('click', async () => {
+    lbTrimSave.disabled = true
+    lbTrimSave.textContent = 'Trimming…'
+    try {
+      const r = await fetch('/api/trim/' + encodeURIComponent(trimFilename), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start: Math.round(trimStart * 1000) / 1000, end: Math.round(trimEnd * 1000) / 1000 })
+      })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j.error)
+      lbTrimSave.textContent = 'Saved!'
+      setTimeout(() => { closeLightbox(); loadMedia() }, 700)
+    } catch (err) {
+      lbTrimSave.textContent = 'Failed: ' + err.message
+      setTimeout(() => { lbTrimSave.textContent = 'Trim & Save'; lbTrimSave.disabled = false }, 3000)
+    }
+  })
+
+  function openLightbox(name) {
+    const isVid = VIDEO_RE.test(name)
+    lbImg.style.display = isVid ? 'none' : ''
+    lbVid.style.display = isVid ? '' : 'none'
+    lbNameEl.textContent = name
+    if (isVid) {
+      trimFilename = name; trimStart = 0; trimEnd = 0; trimDuration = 0
+      lbTrimSave.textContent = 'Trim & Save'; lbTrimSave.disabled = true
+      lbVid.src = '/photos/' + encodeURIComponent(name)
+      lbVid.play()
+      lightbox.classList.add('trimming')
+    } else {
+      lbImg.src = '/photos/' + encodeURIComponent(name)
+      lightbox.classList.remove('trimming')
+    }
+    lightbox.classList.add('open')
+    document.addEventListener('keydown', onLbKey)
+  }
+
+  function closeLightbox() {
+    lightbox.classList.remove('open', 'trimming')
+    lbVid.pause(); lbVid.src = ''; lbImg.src = ''
+    draggingHandle = null
+    document.removeEventListener('keydown', onLbKey)
+    
+    // If we sent this image to slideshow, tell it to resume when lightbox closes
+    if (sentToSlideshow) {
+      sentToSlideshow = false
+      fetch('/api/resume-slideshow', { method: 'POST' }).catch(() => {})
+    }
+  }
+
+  function onLbKey(e) { if (e.key === 'Escape') closeLightbox() }
+
+  lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox() })
+  lbClose.addEventListener('click', closeLightbox)
+
+  lbShowSlideshow.addEventListener('click', async () => {
+    const name = lbNameEl.textContent
+    console.log('[show-now] Button clicked, filename:', name)
+    if (!name) {
+      console.log('[show-now] No filename, aborting')
+      return
+    }
+    
+    const origText = lbShowSlideshow.textContent
+    lbShowSlideshow.disabled = true
+    lbShowSlideshow.textContent = 'Sending...'
+    
+    try {
+      console.log('[show-now] Sending POST request...')
+      const res = await fetch('/api/show-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: name })
+      })
+      
+      console.log('[show-now] Response status:', res.status)
+      const data = await res.json()
+      console.log('[show-now] Response data:', data)
+      
+      if (res.ok) {
+        sentToSlideshow = true
+        lbShowSlideshow.textContent = '✓ Sent!'
+        console.log('[show-now] Success! sentToSlideshow =', sentToSlideshow)
+        setTimeout(() => {
+          lbShowSlideshow.textContent = origText
+          lbShowSlideshow.disabled = false
+        }, 1500)
+      } else {
+        throw new Error('Failed to send')
+      }
+    } catch (e) {
+      console.error('[show-now] Error:', e)
+      lbShowSlideshow.textContent = '✗ Failed: ' + e.message
+      setTimeout(() => {
+        lbShowSlideshow.textContent = origText
+        lbShowSlideshow.disabled = false
+      }, 2000)
+    }
+  })
+
+  // ── Queue ─────────────────────────────────────────────────────────────────
+
+  const localQueue = new Map()  // id → { id, name, thumbName, status, progress, error }
+  let knownDone    = new Set()
+  let pollTimer    = null
+
+  function startQueuePolling() {
+    clearTimeout(pollTimer)
+    pollTimer = setTimeout(pollQueue, 1200)
+  }
+
+  async function pollQueue() {
+    try {
+      const serverItems = await (await fetch('/api/queue')).json()
+      const serverMap   = new Map(serverItems.map(i => [i.id, i]))
+
+      // Import items the server knows about that we missed (e.g. page-reload mid-queue)
+      for (const si of serverItems) {
+        if (!localQueue.has(si.id) && si.status !== 'done') {
+          localQueue.set(si.id, { id: si.id, name: si.name, thumbName: si.thumbName,
+                                  status: si.status, progress: si.progress, error: si.error })
+        }
+      }
+
+      // Merge server state into localQueue
+      for (const [id, item] of localQueue) {
+        const si = serverMap.get(id)
+        if (si) {
+          item.status = si.status; item.error = si.error; item.progress = si.progress
+          if (si.thumbName) item.thumbName = si.thumbName
+        } else if (item.status === 'pending' || item.status === 'processing') {
+          item.status = 'done'   // server pruned it — completed successfully
+        }
+      }
+
+      // Detect newly done → refresh library, then remove from localQueue
+      const nowDone = [...localQueue.values()].filter(i => i.status === 'done' && !knownDone.has(i.id))
+      if (nowDone.length) {
+        nowDone.forEach(i => knownDone.add(i.id))
+        await loadMedia()
+        const librarySet = new Set(allFiles.map(f => f.name))
+        for (const item of nowDone) {
+          if (librarySet.has(item.name)) localQueue.delete(item.id)
+        }
+      }
+
+      renderQueue()
+
+      const hasWork = [...localQueue.values()].some(i => i.status === 'pending' || i.status === 'processing')
+      if (hasWork || localQueue.size > 0) pollTimer = setTimeout(pollQueue, 2000)
+    } catch { if (localQueue.size > 0) pollTimer = setTimeout(pollQueue, 3000) }
+  }
+
+  function renderQueue() {
+    const visible = [...localQueue.values()].filter(i => i.status !== 'done')
+    // Use 'block' not '' — '' falls back to CSS display:none
+    queueSection.style.display = visible.length ? 'block' : 'none'
+    if (!visible.length) return
+
+    const n = visible.filter(i => i.status === 'pending' || i.status === 'processing').length
+    queueHeading.textContent = n ? `Processing — ${n} item${n > 1 ? 's' : ''} in queue` : 'Processing queue'
+
+    // Remove cards for items no longer visible
+    const visibleIds = new Set(visible.map(i => i.id))
+    for (const el of [...queueGrid.querySelectorAll('.queue-card')]) {
+      if (!visibleIds.has(el.dataset.qid)) el.remove()
+    }
+
+    const icons = {
+      pending:    '<span class="spin-ring spin-ring--pending"></span>',
+      processing: '<span class="spin-ring"></span>',
+      error: '✗'
+    }
+    const msgs = { pending: 'Waiting…', error: 'Failed' }
+
+    for (const item of visible) {
+      const isVid = VIDEO_RE.test(item.name)
+      let card = queueGrid.querySelector(`.queue-card[data-qid="${item.id}"]`)
+
+      if (!card) {
+        // Create card skeleton once
+        card = document.createElement('div')
+        card.dataset.qid = item.id
+
+        const img = document.createElement('img'); img.alt = ''; img.dataset.loaded = ''
+        card.appendChild(img)
+
+        const overlay = document.createElement('div')
+        overlay.className = 'queue-overlay'
+        const iconEl = document.createElement('div'); iconEl.className = 'q-icon'; iconEl.dataset.status = ''
+        const txtEl  = document.createElement('div'); txtEl.className = 'q-status-text'
+        const pctEl  = document.createElement('div'); pctEl.className = 'q-pct'
+        const wrap   = document.createElement('div'); wrap.className = 'q-progress-wrap'
+        const bar    = document.createElement('div'); bar.className = 'q-progress-bar'; bar.style.width = '0%'
+        wrap.appendChild(bar)
+        overlay.append(iconEl, txtEl, pctEl, wrap)
+        card.appendChild(overlay)
+
+        const nameEl = document.createElement('div'); nameEl.className = 'q-name'
+        nameEl.textContent = item.name
+        card.appendChild(nameEl)
+
+        queueGrid.appendChild(card)
+      }
+
+      // Update class
+      card.className = 'queue-card status-' + item.status
+      if (item.error) card.title = item.error
+
+      // Load thumb only once (avoid re-requesting on every poll)
+      const img = card.querySelector('img')
+      if (img && item.thumbName && !img.dataset.loaded) {
+        img.dataset.loaded = '1'
+        let retries = 0
+        const tryLoad = () => { img.src = '/thumbs/' + encodeURIComponent(item.thumbName) + '?t=' + Date.now() }
+        img.onerror = () => { if (retries++ < 8) setTimeout(tryLoad, 1500) }
+        tryLoad()
+      }
+
+      // Update icon only when status changes
+      const iconEl = card.querySelector('.q-icon')
+      if (iconEl && iconEl.dataset.status !== item.status) {
+        iconEl.innerHTML = icons[item.status] || ''
+        iconEl.dataset.status = item.status
+      }
+
+      // Update status text
+      const txtEl = card.querySelector('.q-status-text')
+      if (txtEl) txtEl.textContent = (item.status === 'processing' ? (isVid ? 'Transcoding…' : 'Converting…') : msgs[item.status]) || ''
+
+      // Error message and dismiss button (add once)
+      if (item.status === 'error' && !card.querySelector('.q-error-msg')) {
+        const overlay = card.querySelector('.queue-overlay')
+        if (item.error) {
+          const errEl = document.createElement('div'); errEl.className = 'q-error-msg'
+          errEl.textContent = item.error; overlay.appendChild(errEl)
+        }
+        const dis = document.createElement('button'); dis.className = 'q-dismiss'; dis.title = 'Dismiss'; dis.textContent = '×'
+        dis.addEventListener('click', e => { e.stopPropagation(); localQueue.delete(item.id); renderQueue() })
+        card.appendChild(dis)
+      }
+
+      // Progress bar
+      const bar   = card.querySelector('.q-progress-bar')
+      const pctEl = card.querySelector('.q-pct')
+      const wrap  = card.querySelector('.q-progress-wrap')
+      if (isVid && item.status === 'processing' && item.progress != null) {
+        if (bar)   bar.style.width = item.progress + '%'
+        if (pctEl) pctEl.textContent = item.progress + '%'
+        if (wrap)  wrap.style.display = ''
+      } else {
+        if (pctEl) pctEl.textContent = ''
+        if (wrap)  wrap.style.display = 'none'
+      }
+    }
+  }
+
+  loadMedia()
+  startQueuePolling()
+
+  // ── Settings panel ────────────────────────────────────────────────────────
+  const btnSettings  = document.getElementById('btn-settings')
+  const settingsPanel = document.getElementById('settings-panel')
+  const spInterval   = document.getElementById('sp-interval')
+  const spIntervalV  = document.getElementById('sp-interval-val')
+  const spTransition = document.getElementById('sp-transition')
+  const spKB         = document.getElementById('sp-kenburns')
+  const spOrder      = document.getElementById('sp-order')
+  const spFit        = document.getElementById('sp-fit')
+  const spSave       = document.getElementById('sp-save')
+  const spStatus     = document.getElementById('sp-status')
+  const haUrl        = document.getElementById('ha-url')
+  const haToken      = document.getElementById('ha-token')
+  const haSave       = document.getElementById('ha-save')
+  const haStatus     = document.getElementById('ha-status')
+
+  btnSettings.addEventListener('click', async () => {
+    const isOpen = settingsPanel.classList.toggle('open')
+    if (!isOpen) return
+    // Load current config
+    try {
+      const [cfgRes, haRes] = await Promise.all([fetch('/api/config'), fetch('/api/ha-sync')])
+      const cfg = await cfgRes.json()
+      const ha  = await haRes.json()
+      spInterval.value  = cfg.interval || 10
+      spIntervalV.textContent = (cfg.interval || 10) + 's'
+      spTransition.value = cfg.transition || 'crossfade'
+      spKB.checked       = !!cfg.kenBurns
+      spOrder.value      = cfg.order || 'random'
+      spFit.value        = cfg.fit || 'cover'
+      haUrl.value        = ha.url || ''
+      haStatus.textContent = ha.configured ? '✓ Connected' : 'Not configured'
+      haStatus.style.color = ha.configured ? '#3a7a3a' : '#555'
+    } catch { spStatus.textContent = 'Failed to load config' }
+  })
+
+  spInterval.addEventListener('input', () => { spIntervalV.textContent = spInterval.value + 's' })
+
+  spSave.addEventListener('click', async () => {
+    spStatus.textContent = 'Saving…'
+    const cfg = {
+      interval:   parseInt(spInterval.value),
+      transition: spTransition.value,
+      kenBurns:   spKB.checked,
+      order:      spOrder.value,
+      fit:        spFit.value,
+    }
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cfg)
+      })
+      spStatus.textContent = '✓ Saved'
+      setTimeout(() => { spStatus.textContent = '' }, 2500)
+    } catch {
+      spStatus.textContent = 'Error saving'
+    }
+  })
+
+  haSave.addEventListener('click', async () => {
+    haStatus.textContent = 'Saving…'; haStatus.style.color = '#555'
+    try {
+      const res = await fetch('/api/ha-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: haUrl.value.trim(), token: haToken.value.trim() })
+      })
+      const data = await res.json()
+      if (data.ok) {
+        haStatus.textContent = '✓ Connected'
+        haStatus.style.color = '#3a7a3a'
+        haToken.value = ''  // clear token from UI for security
+      } else {
+        haStatus.textContent = data.error || 'Error'
+        haStatus.style.color = '#8b2020'
+      }
+    } catch {
+      haStatus.textContent = 'Error'
+      haStatus.style.color = '#8b2020'
+    }
+  })
+
+</script>
+</body>
+</html>
