@@ -220,7 +220,8 @@
     width: 140px;
     flex-shrink: 0;
   }
-  .info-panel-thumb {
+  .info-panel-thumb,
+  .info-panel-thumb-video {
     width: 116px;
     height: 80px;
     object-fit: cover;
@@ -1253,12 +1254,19 @@
       const panel = document.createElement('div')
       panel.className = 'info-panel'
 
-      const thumb = document.createElement('img')
-      thumb.className = 'info-panel-thumb'
-      // Videos don't have thumbs — use the photo URL directly (browser will show first frame)
+      let thumb
       if (VIDEO_EXTS.test(fn)) {
+        // Use a muted video element and seek to first frame — same approach as manage page
+        thumb = document.createElement('video')
+        thumb.className = 'info-panel-thumb'
         thumb.src = '/photos/' + encodeURIComponent(fn)
+        thumb.muted = true
+        thumb.playsInline = true
+        thumb.preload = 'metadata'
+        thumb.addEventListener('loadedmetadata', () => { thumb.currentTime = 0.001 }, { once: true })
       } else {
+        thumb = document.createElement('img')
+        thumb.className = 'info-panel-thumb'
         thumb.src = '/thumbs/' + encodeURIComponent(fn)
         thumb.onerror = () => { thumb.src = '/photos/' + encodeURIComponent(fn) }
       }
