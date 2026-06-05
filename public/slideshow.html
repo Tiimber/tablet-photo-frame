@@ -36,6 +36,22 @@
     display: block;
     object-fit: cover;
   }
+
+  .date-label {
+    position: absolute;
+    bottom: 10px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-weight: 300;
+    font-size: 20px;
+    color: #fff;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    pointer-events: none;
+    z-index: 10;
+    letter-spacing: 0.04em;
+  }
   body.fit-contain .media-item img,
   body.fit-contain .media-item video { object-fit: contain; }
   .media-item video.portrait { object-fit: contain; }
@@ -267,6 +283,7 @@
     'pixelate','glitch','shatter']
 
   const infoCache = {}
+  const dateCache = {}   // filename → 'YYYY-MM-DD' or null
   let photos = []
   let queuePos = 0
   let displayedIndex = 0
@@ -363,6 +380,14 @@
       img.src = '/photos/' + encodeURIComponent(fn)
       img.alt = fn
       item.appendChild(img)
+    }
+    // Date overlay
+    const date = dateCache[fn]
+    if (date) {
+      const lbl = document.createElement('div')
+      lbl.className = 'date-label'
+      lbl.textContent = date
+      item.appendChild(lbl)
     }
     return item
   }
@@ -884,6 +909,8 @@
     try {
       const res = await fetch('/api/photos')
       const list = await res.json()
+      // Cache dates from API response
+      list.forEach(f => { if (f.name && f.date !== undefined) dateCache[f.name] = f.date || null })
       if (config.order === 'random') shuffle(list)
       else list.sort()
       photos = list.map(f => f.name || f)
