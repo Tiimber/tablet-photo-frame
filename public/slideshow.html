@@ -820,12 +820,11 @@
     incoming.className = 'slide' + (isStack ? ' stacked' : '')
     group.forEach((fn, i) => incoming.appendChild(buildMediaItem(fn, infos[i])))
 
-    if (!isDual && config.kenBurns && !infos[0].isVideo) {
-      const img = incoming.querySelector('img')
-      if (img) {
+    if (config.kenBurns) {
+      incoming.querySelectorAll('.media-item img').forEach(img => {
         const n = 1 + Math.floor(Math.random() * 3)
         img.style.animation = `kb${n} ${config.interval}s ease-in-out forwards`
-      }
+      })
     }
 
     await doTransition(incoming, outgoing)
