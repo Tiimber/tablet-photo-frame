@@ -1,0 +1,7 @@
+{
+  "interval": 10,
+  "transition": "crossfade",
+  "kenBurns": false,
+  "order": "random",
+  "fit": "cover"
+}
