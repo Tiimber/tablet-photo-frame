@@ -4,6 +4,8 @@ const express   = require('express')
 const multer    = require('multer')
 const path      = require('path')
 const fs        = require('fs')
+const http      = require('http')
+const { WebSocketServer } = require('ws')
 const { spawn, spawnSync } = require('child_process')
 
 // ── Server Configuration ─────────────────────────────────────────────────────
@@ -14,13 +16,22 @@ const DEFAULT_SERVER_CONFIG = {
   upload: { maxSizeMB: 1024, imageMagickMemoryMB: 200, imageMagickMapMB: 400 },
   polling: { photoReloadMinutes: 5, showNowSeconds: 2, queueInitialMs: 1200, queueActiveMs: 2000, queueErrorMs: 3000 },
   http: { timeoutSeconds: 10 },
-  paths: { photos: './photos', videos: './videos', pending: './pending', thumbs: './thumbs', public: './public' }
+  paths: { photos: './photos', videos: './videos', pending: './pending', thumbs: './thumbs', public: './public' },
+  processing: { maxConcurrent: 3, maxConcurrentVideos: 1 }
 }
 
 function loadServerConfig() {
   try {
     const loaded = JSON.parse(fs.readFileSync(SERVER_CONFIG_FILE, 'utf8'))
-    return { ...DEFAULT_SERVER_CONFIG, ...loaded }
+    return {
+      ...DEFAULT_SERVER_CONFIG,
+      ...loaded,
+      upload:     { ...DEFAULT_SERVER_CONFIG.upload,     ...(loaded.upload     || {}) },
+      polling:    { ...DEFAULT_SERVER_CONFIG.polling,    ...(loaded.polling    || {}) },
+      http:       { ...DEFAULT_SERVER_CONFIG.http,       ...(loaded.http       || {}) },
+      paths:      { ...DEFAULT_SERVER_CONFIG.paths,      ...(loaded.paths      || {}) },
+      processing: { ...DEFAULT_SERVER_CONFIG.processing, ...(loaded.processing || {}) },
+    }
   } catch { return { ...DEFAULT_SERVER_CONFIG } }
 }
 
@@ -64,10 +75,30 @@ function sanitizeName(name) {
   return base + ext
 }
 
+// ── WebSocket broadcast ───────────────────────────────────────────────────────
+
+// Populated after wss is created below
+let wss = null
+
+function broadcast(msg) {
+  if (!wss) return
+  const data = JSON.stringify(msg)
+  for (const client of wss.clients) {
+    if (client.readyState === 1 /* OPEN */) client.send(data)
+  }
+}
+
 // ── Transcoding queue ────────────────────────────────────────────────────────
 
-const queue = []          // { id, origPath, outName, thumbName, status, error? }
-let queueRunning = false
+// queue items: { id, origPath, outName, thumbName, status, error?, progress?, isVideo }
+const queue = []
+
+// Concurrency counters
+let runningTotal = 0
+let runningVideos = 0
+
+const MAX_CONCURRENT       = serverConfig.processing.maxConcurrent
+const MAX_CONCURRENT_VIDEOS = serverConfig.processing.maxConcurrentVideos
 
 // Quickly generate a small preview thumbnail in background (fire-and-forget)
 function generateThumb(origPath, thumbName) {
@@ -86,13 +117,25 @@ function generateThumb(origPath, thumbName) {
 function enqueueMedia(origPath, outName) {
   const id        = Date.now() + '_' + Math.random().toString(36).slice(2)
   const thumbName = path.basename(outName, path.extname(outName)) + '_thumb.jpg'
-  queue.push({ id, origPath, outName, thumbName, status: 'pending' })
+  const isVideo   = VIDEO_EXTS.has(path.extname(origPath).toLowerCase())
+  queue.push({ id, origPath, outName, thumbName, status: 'pending', isVideo })
+  broadcastQueue()
   processQueue()
   return id
 }
 
+function broadcastQueue() {
+  broadcast({
+    type: 'queue',
+    items: queue.map(({ id, outName, thumbName, status, error, progress }) =>
+      ({ id, name: outName, thumbName, status, error, progress }))
+  })
+}
+
 function finishQueueItem(item, outPath, code, signal, errTail) {
-  queueRunning = false
+  runningTotal--
+  if (item.isVideo) runningVideos--
+
   if (code === 0) {
     item.status   = 'done'
     item.progress = 100
@@ -111,98 +154,112 @@ function finishQueueItem(item, outPath, code, signal, errTail) {
     // origPath (in pending/) is intentionally kept on failure so a server restart will retry it
   }
   if (item.thumbName) try { fs.unlinkSync(path.join(THUMBS_DIR, item.thumbName)) } catch {}
+
+  // Prune old completed/errored items (keep at most 20)
   const done = queue.filter(i => i.status === 'done' || i.status === 'error')
   if (done.length > 20) queue.splice(queue.indexOf(done[0]), 1)
+
+  broadcastQueue()
   processQueue()
 }
 
 function processQueue() {
-  if (queueRunning) return
-  const next = queue.find(i => i.status === 'pending')
-  if (!next) return
-  queueRunning = true
-  next.status   = 'processing'
-  next.progress = null
-  console.log('[transcode] start:', next.outName)
-  // Generate thumb now (not at enqueue), so only one thumb process runs at a time
-  generateThumb(next.origPath, next.thumbName)
+  // Start as many pending items as concurrency limits allow
+  for (const next of queue) {
+    if (next.status !== 'pending') continue
+    if (runningTotal >= MAX_CONCURRENT) break
+    if (next.isVideo && runningVideos >= MAX_CONCURRENT_VIDEOS) continue
 
-  const outPath = path.join(PHOTOS_DIR, next.outName)
-  const isVideo = VIDEO_EXTS.has(path.extname(next.origPath).toLowerCase())
+    runningTotal++
+    if (next.isVideo) runningVideos++
+    next.status   = 'processing'
+    next.progress = null
+    console.log('[transcode] start:', next.outName)
+    broadcastQueue()
 
-  if (!isVideo) {
-    // Images → ImageMagick with memory limits to avoid OOM on large HEICs
-    const proc = spawn('convert', [
-      '-limit', 'memory', `${serverConfig.upload.imageMagickMemoryMB}MiB`,
-      '-limit', 'map', `${serverConfig.upload.imageMagickMapMB}MiB`,
-      next.origPath + '[0]', '-auto-orient', '-resize', '1920x1080>',
-      '-strip', '-quality', '85', outPath
-    ])
-    let errTail = ''
-    proc.stderr.on('data', d => { errTail = (errTail + d.toString()).slice(-1000) })
-    proc.on('close', (code, signal) => {
-      if (code === 0) {
-        // Re-embed only the date tags from the original before deleting it
-        const et = spawn('exiftool', [
-          '-TagsFromFile', next.origPath,
-          '-DateTimeOriginal', '-CreateDate', '-DateTime', '-ModifyDate',
-          '-overwrite_original', '-q', outPath
-        ])
-        et.on('close', () => finishQueueItem(next, outPath, code, signal, errTail))
-      } else {
-        finishQueueItem(next, outPath, code, signal, errTail)
-      }
-    })
-    return
-  }
+    // Generate thumb now (not at enqueue), so thumb processes are staggered
+    generateThumb(next.origPath, next.thumbName)
 
-  // Videos → probe duration first, then validate file is complete, then ffmpeg
-  const probe = spawn('ffprobe', [
-    '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', next.origPath
-  ])
-  let probeOut = '', probeErr = ''
-  probe.stdout.on('data', d => { probeOut += d.toString() })
-  probe.stderr.on('data', d => { probeErr += d.toString() })
-  probe.on('close', (probeCode) => {
-    if (probeCode !== 0) {
-      // File is unreadable/corrupt — likely incomplete upload
-      const reason = probeErr.trim().split('\n').filter(Boolean).pop() || 'Unreadable file'
-      next.status = 'error'
-      next.error  = reason
-      queueRunning = false
-      console.error('[transcode] probe failed:', next.outName, reason)
-      try { fs.unlinkSync(next.origPath) } catch {}
-      if (next.thumbName) try { fs.unlinkSync(path.join(THUMBS_DIR, next.thumbName)) } catch {}
-      const done = queue.filter(i => i.status === 'done' || i.status === 'error')
-      if (done.length > 20) queue.splice(queue.indexOf(done[0]), 1)
-      processQueue()
-      return
+    const outPath = path.join(PHOTOS_DIR, next.outName)
+
+    if (!next.isVideo) {
+      // Images → ImageMagick with memory limits to avoid OOM on large HEICs
+      const proc = spawn('convert', [
+        '-limit', 'memory', `${serverConfig.upload.imageMagickMemoryMB}MiB`,
+        '-limit', 'map', `${serverConfig.upload.imageMagickMapMB}MiB`,
+        next.origPath + '[0]', '-auto-orient', '-resize', '1920x1080>',
+        '-strip', '-quality', '85', outPath
+      ])
+      let errTail = ''
+      proc.stderr.on('data', d => { errTail = (errTail + d.toString()).slice(-1000) })
+      proc.on('close', (code, signal) => {
+        if (code === 0) {
+          // Re-embed only the date tags from the original before deleting it
+          const et = spawn('exiftool', [
+            '-TagsFromFile', next.origPath,
+            '-DateTimeOriginal', '-CreateDate', '-DateTime', '-ModifyDate',
+            '-overwrite_original', '-q', outPath
+          ])
+          et.on('close', () => finishQueueItem(next, outPath, code, signal, errTail))
+        } else {
+          finishQueueItem(next, outPath, code, signal, errTail)
+        }
+      })
+      continue
     }
 
-    let durationUs = 0
-    try { durationUs = Math.round(parseFloat(JSON.parse(probeOut).format.duration) * 1e6) } catch {}
-
-    const ff = spawn('ffmpeg', [
-      '-i', next.origPath,
-      '-map_metadata', '0',
-      '-vf', "scale=w='min(iw,1920)':h='min(ih,1080)':force_original_aspect_ratio=decrease," +
-             "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-      '-c:v', 'libx264', '-crf', '26', '-preset', 'fast',
-      '-an', '-movflags', '+faststart',
-      '-progress', 'pipe:1',
-      '-y', outPath
+    // Videos → probe duration first, then validate file is complete, then ffmpeg
+    const probe = spawn('ffprobe', [
+      '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', next.origPath
     ])
-
-    let errTail = ''
-    ff.stdout.on('data', d => {
-      const m = d.toString().match(/out_time_us=(\d+)/)
-      if (m && durationUs > 0) {
-        next.progress = Math.min(99, Math.round(parseInt(m[1]) / durationUs * 100))
+    let probeOut = '', probeErr = ''
+    probe.stdout.on('data', d => { probeOut += d.toString() })
+    probe.stderr.on('data', d => { probeErr += d.toString() })
+    probe.on('close', (probeCode) => {
+      if (probeCode !== 0) {
+        // File is unreadable/corrupt — likely incomplete upload
+        const reason = probeErr.trim().split('\n').filter(Boolean).pop() || 'Unreadable file'
+        next.status = 'error'
+        next.error  = reason
+        runningTotal--
+        runningVideos--
+        console.error('[transcode] probe failed:', next.outName, reason)
+        try { fs.unlinkSync(next.origPath) } catch {}
+        if (next.thumbName) try { fs.unlinkSync(path.join(THUMBS_DIR, next.thumbName)) } catch {}
+        const done = queue.filter(i => i.status === 'done' || i.status === 'error')
+        if (done.length > 20) queue.splice(queue.indexOf(done[0]), 1)
+        broadcastQueue()
+        processQueue()
+        return
       }
+
+      let durationUs = 0
+      try { durationUs = Math.round(parseFloat(JSON.parse(probeOut).format.duration) * 1e6) } catch {}
+
+      const ff = spawn('ffmpeg', [
+        '-i', next.origPath,
+        '-map_metadata', '0',
+        '-vf', "scale=w='min(iw,1920)':h='min(ih,1080)':force_original_aspect_ratio=decrease," +
+               "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        '-c:v', 'libx264', '-crf', '26', '-preset', 'fast',
+        '-an', '-movflags', '+faststart',
+        '-progress', 'pipe:1',
+        '-y', outPath
+      ])
+
+      let errTail = ''
+      ff.stdout.on('data', d => {
+        const m = d.toString().match(/out_time_us=(\d+)/)
+        if (m && durationUs > 0) {
+          const prev = next.progress
+          next.progress = Math.min(99, Math.round(parseInt(m[1]) / durationUs * 100))
+          if (next.progress !== prev) broadcastQueue()
+        }
+      })
+      ff.stderr.on('data', d => { errTail = (errTail + d.toString()).slice(-1000) })
+      ff.on('close', (code, signal) => finishQueueItem(next, outPath, code, signal, errTail))
     })
-    ff.stderr.on('data', d => { errTail = (errTail + d.toString()).slice(-1000) })
-    ff.on('close', (code, signal) => finishQueueItem(next, outPath, code, signal, errTail))
-  })
+  }
 }
 
 // Re-queue any files left in pending/ from a previous run.
@@ -283,22 +340,11 @@ app.get('/api/photos', (req, res) => {
 // ── Home Assistant two-way sync ───────────────────────────────────────────────
 const HA_SYNC_FILE = path.join(__dirname, 'ha_sync.json')
 
-// Show-now command (for remote control from manage page)
-let showNowCommand = null
-let resumeSlideshow = false
-
 function loadHASync() {
   try { return JSON.parse(fs.readFileSync(HA_SYNC_FILE, 'utf8')) }
   catch { return null }
 }
 
-const HA_ENTITIES = {
-  interval:   { domain: 'input_number',  service: 'set_value',      key: 'value'  },
-  transition: { domain: 'input_select',  service: 'select_option',  key: 'option', entity: 'slideshow_transition' },
-  kenBurns:   { domain: 'input_boolean', service: null,             entity: 'slideshow_ken_burns' },
-  order:      { domain: 'input_select',  service: 'select_option',  key: 'option', entity: 'slideshow_order' },
-  fit:        { domain: 'input_select',  service: 'select_option',  key: 'option', entity: 'slideshow_fit' },
-}
 const HA_ENTITY_IDS = {
   interval:   'input_number.slideshow_interval',
   transition: 'input_select.slideshow_transition',
@@ -353,11 +399,13 @@ app.post('/api/config', async (req, res) => {
   const cfg = { ...old, ...req.body }
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg))
   res.json(cfg)
+  // Broadcast config change to all connected WebSocket clients
+  broadcast({ type: 'config', config: cfg })
   // Sync changed fields back to HA (only if something actually changed, preventing loops)
   syncToHA(cfg, old).catch(() => {})
 })
 
-// Expose polling intervals to frontend
+// Expose polling intervals to frontend (kept for backwards compat)
 app.get('/api/config/polling', (req, res) => {
   res.json(serverConfig.polling)
 })
@@ -375,40 +423,27 @@ app.post('/api/ha-sync', express.json(), (req, res) => {
   res.json({ ok: true })
 })
 
-// Show-now endpoint — allows remote control of slideshow
+// Show-now endpoint — allows remote control of slideshow via WebSocket broadcast
+// HTTP endpoints kept for backwards compatibility
 app.post('/api/show-now', express.json(), (req, res) => {
   const { filename } = req.body || {}
   if (!filename) return res.status(400).json({ error: 'filename required' })
-  showNowCommand = { filename, timestamp: Date.now() }
-  console.log('[show-now] SET:', filename)
+  console.log('[show-now] broadcast:', filename)
+  broadcast({ type: 'show-now', filename })
   res.json({ ok: true })
 })
 
+// Legacy polling endpoint — returns empty so old clients don't break
 app.get('/api/show-now', (req, res) => {
-  const response = { filename: null, resume: false }
-  
-  if (resumeSlideshow) {
-    response.resume = true
-    resumeSlideshow = false
-    console.log('[show-now] GET: resume=true')
-  } else if (showNowCommand) {
-    response.filename = showNowCommand.filename
-    response.timestamp = showNowCommand.timestamp
-    console.log('[show-now] GET: filename=', showNowCommand.filename)
-    showNowCommand = null  // Clear after reading
-  } else {
-    console.log('[show-now] GET: nothing (current value:', showNowCommand, ')')
-  }
-  
-  res.json(response)
+  res.json({ filename: null, resume: false })
 })
 
 app.post('/api/resume-slideshow', (req, res) => {
-  resumeSlideshow = true
+  broadcast({ type: 'resume-slideshow' })
   res.json({ ok: true })
 })
 
-// Queue status endpoint — polled by manage.html
+// Queue status endpoint — polled by manage.html as fallback
 app.get('/api/queue', (req, res) => {
   res.json(queue.map(({ id, outName, thumbName, status, error, progress }) =>
     ({ id, name: outName, thumbName, status, error, progress })))
@@ -463,6 +498,8 @@ app.delete('/api/photos/:filename', (req, res) => {
     fs.unlinkSync(filePath)
     const meta = loadMeta()
     if (meta[filename]) { delete meta[filename]; saveMeta(meta) }
+    // Notify all clients that a file was deleted
+    broadcast({ type: 'photo-deleted', filename })
     res.json({ ok: true })
   }
   catch { res.status(404).json({ error: 'Not found' }) }
@@ -504,4 +541,29 @@ app.post('/api/trim/:filename', (req, res) => {
   })
 })
 
-app.listen(serverConfig.port, () => console.log(`Slideshow server on :${serverConfig.port}`))
+// ── HTTP server + WebSocket server ───────────────────────────────────────────
+
+const server = http.createServer(app)
+
+wss = new WebSocketServer({ server })
+
+wss.on('connection', (ws) => {
+  console.log('[ws] client connected, total:', wss.clients.size)
+
+  // Send current queue state immediately on connect
+  ws.send(JSON.stringify({
+    type: 'queue',
+    items: queue.map(({ id, outName, thumbName, status, error, progress }) =>
+      ({ id, name: outName, thumbName, status, error, progress }))
+  }))
+
+  ws.on('close', () => {
+    console.log('[ws] client disconnected, total:', wss.clients.size)
+  })
+
+  ws.on('error', (err) => {
+    console.error('[ws] error:', err.message)
+  })
+})
+
+server.listen(serverConfig.port, () => console.log(`Slideshow server on :${serverConfig.port}`))

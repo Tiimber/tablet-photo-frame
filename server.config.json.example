@@ -21,5 +21,9 @@
     "pending": "./pending",
     "thumbs": "./thumbs",
     "public": "./public"
+  },
+  "processing": {
+    "maxConcurrent": 3,
+    "maxConcurrentVideos": 1
   }
 }

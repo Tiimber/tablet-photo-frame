@@ -87,6 +87,10 @@ A full-featured photo and video slideshow system with web-based management inter
     "pending": "./pending",
     "thumbs": "./thumbs",
     "public": "./public"
+  },
+  "processing": {
+    "maxConcurrent": 3,
+    "maxConcurrentVideos": 1
   }
 }
 ```
@@ -97,12 +101,14 @@ A full-featured photo and video slideshow system with web-based management inter
 - `upload.imageMagickMemoryMB`: ImageMagick memory limit for processing large images
 - `upload.imageMagickMapMB`: ImageMagick map limit
 - `polling.photoReloadMinutes`: How often slideshow checks for new photos
-- `polling.showNowSeconds`: Polling interval for remote control commands
-- `polling.queueInitialMs`: Initial delay before checking processing queue
-- `polling.queueActiveMs`: Polling interval while files are processing
-- `polling.queueErrorMs`: Polling interval after an error
+- `polling.showNowSeconds`: Legacy — no longer used (remote control is now WebSocket-based)
+- `polling.queueInitialMs`: Legacy — no longer used (queue updates are now WebSocket-based)
+- `polling.queueActiveMs`: Legacy — no longer used
+- `polling.queueErrorMs`: Legacy — no longer used
 - `http.timeoutSeconds`: HTTP timeout for external requests (e.g., Home Assistant)
 - `paths.*`: Directory paths for media storage (relative to project root)
+- `processing.maxConcurrent`: Maximum number of files processed simultaneously (default: 3)
+- `processing.maxConcurrentVideos`: Maximum number of videos transcoded at the same time (default: 1)
 
 ## Project Structure
 
@@ -130,10 +136,21 @@ tablet-photo-frame/
 - `DELETE /api/photos/:name` - Delete media
 - `GET /api/config` - Get slideshow config
 - `POST /api/config` - Update slideshow config
-- `GET /api/config/polling` - Get polling intervals (used by frontend)
-- `POST /api/show-now` - Remote control: show specific image
-- `GET /api/show-now` - Poll for remote control commands
-- `POST /api/resume-slideshow` - Resume after show-now
+- `GET /api/config/polling` - Get polling intervals (legacy, kept for compatibility)
+- `POST /api/show-now` - Remote control: broadcast show-now via WebSocket
+- `GET /api/show-now` - Legacy stub (returns empty, real updates via WebSocket)
+- `POST /api/resume-slideshow` - Broadcast resume via WebSocket
+- `WS /` - WebSocket endpoint for real-time queue, remote control, and config updates
+
+### WebSocket Message Types (server → client)
+
+| Type | Payload | Description |
+|---|---|---|
+| `queue` | `{ items: [...] }` | Full queue snapshot (sent on connect and on every change) |
+| `show-now` | `{ filename }` | Show a specific image on the slideshow immediately |
+| `resume-slideshow` | — | Resume normal slideshow rotation |
+| `config` | `{ config }` | Slideshow config was updated |
+| `photo-deleted` | `{ filename }` | A photo was deleted from the library |
 
 ## Home Assistant Integration
 

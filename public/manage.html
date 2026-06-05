@@ -1101,7 +1101,7 @@
 
       try {
         const json = JSON.parse(respText)
-        if (json.files) { renderQueueFromUpload(json.files); startQueuePolling() }
+        if (json.files) { renderQueueFromUpload(json.files) }
       } catch {}
     }
 
@@ -1137,13 +1137,6 @@
   const selectedSet = new Set()
   let allFiles  = []
   let metaData  = {}
-  
-  // Polling intervals (loaded from server config)
-  let pollingConfig = {
-    queueInitialMs: 1200,
-    queueActiveMs: 2000,
-    queueErrorMs: 3000
-  }
 
   function updateSelectionUI() {
     const n = selectedSet.size
@@ -1590,32 +1583,21 @@
 
   lbShowSlideshow.addEventListener('click', async () => {
     const name = lbNameEl.textContent
-    console.log('[show-now] Button clicked, filename:', name)
-    if (!name) {
-      console.log('[show-now] No filename, aborting')
-      return
-    }
-    
+    if (!name) return
+
     const origText = lbShowSlideshow.textContent
     lbShowSlideshow.disabled = true
     lbShowSlideshow.textContent = 'Sending...'
-    
+
     try {
-      console.log('[show-now] Sending POST request...')
       const res = await fetch('/api/show-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: name })
       })
-      
-      console.log('[show-now] Response status:', res.status)
-      const data = await res.json()
-      console.log('[show-now] Response data:', data)
-      
       if (res.ok) {
         sentToSlideshow = true
         lbShowSlideshow.textContent = '✓ Sent!'
-        console.log('[show-now] Success! sentToSlideshow =', sentToSlideshow)
         setTimeout(() => {
           lbShowSlideshow.textContent = origText
           lbShowSlideshow.disabled = false
@@ -1624,7 +1606,6 @@
         throw new Error('Failed to send')
       }
     } catch (e) {
-      console.error('[show-now] Error:', e)
       lbShowSlideshow.textContent = '✗ Failed: ' + e.message
       setTimeout(() => {
         lbShowSlideshow.textContent = origText
@@ -1633,57 +1614,46 @@
     }
   })
 
-  // ── Queue ─────────────────────────────────────────────────────────────────
+  // ── Queue (WebSocket-driven) ──────────────────────────────────────────────
 
   const localQueue = new Map()  // id → { id, name, thumbName, status, progress, error }
   let knownDone    = new Set()
-  let pollTimer    = null
 
-  function startQueuePolling() {
-    clearTimeout(pollTimer)
-    pollTimer = setTimeout(pollQueue, pollingConfig.queueInitialMs)
-  }
+  // Apply a server queue snapshot to localQueue and trigger UI + library refresh
+  async function applyQueueSnapshot(serverItems) {
+    const serverMap = new Map(serverItems.map(i => [i.id, i]))
 
-  async function pollQueue() {
-    try {
-      const serverItems = await (await fetch('/api/queue')).json()
-      const serverMap   = new Map(serverItems.map(i => [i.id, i]))
-
-      // Import items the server knows about that we missed (e.g. page-reload mid-queue)
-      for (const si of serverItems) {
-        if (!localQueue.has(si.id) && si.status !== 'done') {
-          localQueue.set(si.id, { id: si.id, name: si.name, thumbName: si.thumbName,
-                                  status: si.status, progress: si.progress, error: si.error })
-        }
+    // Import items the server knows about that we missed (e.g. page-reload mid-queue)
+    for (const si of serverItems) {
+      if (!localQueue.has(si.id) && si.status !== 'done') {
+        localQueue.set(si.id, { id: si.id, name: si.name, thumbName: si.thumbName,
+                                status: si.status, progress: si.progress, error: si.error })
       }
+    }
 
-      // Merge server state into localQueue
-      for (const [id, item] of localQueue) {
-        const si = serverMap.get(id)
-        if (si) {
-          item.status = si.status; item.error = si.error; item.progress = si.progress
-          if (si.thumbName) item.thumbName = si.thumbName
-        } else if (item.status === 'pending' || item.status === 'processing') {
-          item.status = 'done'   // server pruned it — completed successfully
-        }
+    // Merge server state into localQueue
+    for (const [id, item] of localQueue) {
+      const si = serverMap.get(id)
+      if (si) {
+        item.status = si.status; item.error = si.error; item.progress = si.progress
+        if (si.thumbName) item.thumbName = si.thumbName
+      } else if (item.status === 'pending' || item.status === 'processing') {
+        item.status = 'done'   // server pruned it — completed successfully
       }
+    }
 
-      // Detect newly done → refresh library, then remove from localQueue
-      const nowDone = [...localQueue.values()].filter(i => i.status === 'done' && !knownDone.has(i.id))
-      if (nowDone.length) {
-        nowDone.forEach(i => knownDone.add(i.id))
-        await loadMedia()
-        const librarySet = new Set(allFiles.map(f => f.name))
-        for (const item of nowDone) {
-          if (librarySet.has(item.name)) localQueue.delete(item.id)
-        }
+    // Detect newly done → refresh library, then remove from localQueue
+    const nowDone = [...localQueue.values()].filter(i => i.status === 'done' && !knownDone.has(i.id))
+    if (nowDone.length) {
+      nowDone.forEach(i => knownDone.add(i.id))
+      await loadMedia()
+      const librarySet = new Set(allFiles.map(f => f.name))
+      for (const item of nowDone) {
+        if (librarySet.has(item.name)) localQueue.delete(item.id)
       }
+    }
 
-      renderQueue()
-
-      const hasWork = [...localQueue.values()].some(i => i.status === 'pending' || i.status === 'processing')
-      if (hasWork || localQueue.size > 0) pollTimer = setTimeout(pollQueue, pollingConfig.queueActiveMs)
-    } catch { if (localQueue.size > 0) pollTimer = setTimeout(pollQueue, pollingConfig.queueErrorMs) }
+    renderQueue()
   }
 
   function renderQueue() {
@@ -1790,17 +1760,41 @@
     }
   }
 
-  // Initialize: load polling config and media
+  // ── WebSocket connection ──────────────────────────────────────────────────
+
+  function connectWebSocket() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+    const ws = new WebSocket(`${proto}://${location.host}`)
+
+    ws.addEventListener('message', async (event) => {
+      let msg
+      try { msg = JSON.parse(event.data) } catch { return }
+
+      if (msg.type === 'queue' && Array.isArray(msg.items)) {
+        await applyQueueSnapshot(msg.items)
+      } else if (msg.type === 'photo-deleted' && msg.filename) {
+        // Remove from local list immediately without a full reload
+        allFiles = allFiles.filter(f => f.name !== msg.filename)
+        selectedSet.delete(msg.filename)
+        updateSelectionUI()
+        renderGrid()
+      }
+      // 'show-now', 'resume-slideshow', 'config' are for the slideshow page only
+    })
+
+    ws.addEventListener('close', () => {
+      setTimeout(connectWebSocket, 3000)
+    })
+
+    ws.addEventListener('error', () => {
+      ws.close()
+    })
+  }
+
+  // Initialize: load media then connect WebSocket
   async function init() {
-    try {
-      const pollingRes = await fetch('/api/config/polling')
-      const poll = await pollingRes.json()
-      Object.assign(pollingConfig, poll)
-    } catch (e) {
-      console.error('Failed to load polling config:', e)
-    }
     await loadMedia()
-    startQueuePolling()
+    connectWebSocket()
   }
 
   init()

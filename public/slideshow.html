@@ -271,12 +271,9 @@
   let timer = null
   let slotA, slotB, useA = true
   let isPaused = false
-  
-  // Polling intervals (loaded from server config)
-  let pollingConfig = {
-    photoReloadMinutes: 5,
-    showNowSeconds: 2
-  }
+
+  // Polling interval for photo list reload (loaded from server config)
+  let photoReloadMinutes = 5
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -515,18 +512,34 @@
     fxCtx.globalAlpha = 1
   }
 
+  // Pre-computed glitch slice data
+  let glitchSlices = null
+
   function doGlitch(oldImg, newImg, progress) {
     const w = fxCanvas.width, h = fxCanvas.height
+
+    // Pre-compute slice positions once
+    if (!glitchSlices) {
+      glitchSlices = Array.from({ length: 8 }, () => ({
+        y:      Math.random() * h,
+        sliceH: 20 + Math.random() * 40,
+        offset: (Math.random() - 0.5) * 60
+      }))
+    }
+
     if (progress < 0.3) {
-      drawImageCover(fxCtx, oldImg, 0, 0, w, h)
-      // Random horizontal slices offset
-      for (let i = 0; i < 8; i++) {
-        const y = Math.random() * h
-        const sliceH = 20 + Math.random() * 40
-        const offset = (Math.random() - 0.5) * 60
-        fxCtx.drawImage(fxCanvas, 0, y, w, sliceH, offset, y, w, sliceH)
+      // Draw old image to an offscreen canvas first, then sample slices from it
+      const off = document.createElement('canvas')
+      off.width = w; off.height = h
+      const octx = off.getContext('2d')
+      drawImageCover(octx, oldImg, 0, 0, w, h)
+
+      fxCtx.drawImage(off, 0, 0)
+      for (const { y, sliceH, offset } of glitchSlices) {
+        fxCtx.drawImage(off, 0, y, w, sliceH, offset, y, w, sliceH)
       }
     } else {
+      glitchSlices = null  // reset for next call
       drawImageCover(fxCtx, newImg, 0, 0, w, h)
     }
   }
@@ -568,35 +581,47 @@
     }
   }
 
+  // Pre-computed shatter piece data (regenerated each transition call)
+  let shatterPieces = null
+
   function doShatter(oldImg, newImg, progress) {
     const w = fxCanvas.width, h = fxCanvas.height
+
+    // Pre-compute piece trajectories once at the start of the transition
+    if (!shatterPieces) {
+      const pieces = 20
+      shatterPieces = []
+      for (let i = 0; i < pieces; i++) {
+        shatterPieces.push({
+          px: (i % 5) * (w / 5),
+          py: Math.floor(i / 5) * (h / 4),
+          pw: w / 5,
+          ph: h / 4,
+          vx: (Math.random() - 0.5) * 300,
+          vy: -200 + Math.random() * 100,
+          rot: (Math.random() - 0.5) * Math.PI
+        })
+      }
+    }
+
     if (progress < 0.3) {
       drawImageCover(fxCtx, oldImg, 0, 0, w, h)
     } else if (progress < 0.7) {
       // Shatter old into pieces that fly away
       const p = (progress - 0.3) / 0.4
-      const pieces = 20
-      for (let i = 0; i < pieces; i++) {
-        const px = (i % 5) * (w / 5)
-        const py = Math.floor(i / 5) * (h / 4)
-        const pw = w / 5, ph = h / 4
-        
-        const vx = (Math.random() - 0.5) * 300 * p
-        const vy = -200 * p + Math.random() * 100 * p
-        const rotation = (Math.random() - 0.5) * Math.PI * p
-        
+      for (const piece of shatterPieces) {
+        const { px, py, pw, ph, vx, vy, rot } = piece
         fxCtx.save()
-        fxCtx.translate(px + pw / 2 + vx, py + ph / 2 + vy)
-        fxCtx.rotate(rotation)
+        fxCtx.translate(px + pw / 2 + vx * p, py + ph / 2 + vy * p)
+        fxCtx.rotate(rot * p)
         fxCtx.globalAlpha = 1 - p
-        
         const sx = (px / w) * oldImg.width, sy = (py / h) * oldImg.height
         const sw = (pw / w) * oldImg.width, sh = (ph / h) * oldImg.height
         fxCtx.drawImage(oldImg, sx, sy, sw, sh, -pw / 2, -ph / 2, pw, ph)
-        
         fxCtx.restore()
       }
     } else {
+      shatterPieces = null  // reset for next call
       // Fade in new
       const p = (progress - 0.7) / 0.3
       fxCtx.globalAlpha = p
@@ -605,26 +630,39 @@
     }
   }
 
+  // Pre-computed paint brush stroke data
+  let paintStrokes = null
+
   function doPaintBrush(oldImg, newImg, progress) {
     const w = fxCanvas.width, h = fxCanvas.height
+
+    // Pre-compute stroke endpoints once
+    if (!paintStrokes) {
+      const strokes = 30
+      paintStrokes = Array.from({ length: strokes }, (_, i) => {
+        const startX = (i / strokes) * w
+        const startY = Math.random() * h
+        return {
+          startX,
+          startY,
+          endX: startX + w * 0.15,
+          endY: startY + (Math.random() - 0.5) * h * 0.3
+        }
+      })
+    }
+
     drawImageCover(fxCtx, oldImg, 0, 0, w, h)
-    
-    // Paint brush strokes revealing new image
-    const strokes = 30
     fxCtx.globalCompositeOperation = 'source-over'
-    
+
+    const strokes = paintStrokes.length
     for (let i = 0; i < strokes; i++) {
       const strokeProgress = Math.max(0, Math.min(1, (progress - i / strokes) / (1 / strokes)))
       if (strokeProgress <= 0) continue
-      
-      const startX = (i / strokes) * w
-      const startY = Math.random() * h
-      const endX = startX + w * 0.15
-      const endY = startY + (Math.random() - 0.5) * h * 0.3
-      
+
+      const { startX, startY, endX, endY } = paintStrokes[i]
       const x = startX + (endX - startX) * strokeProgress
       const y = startY + (endY - startY) * strokeProgress
-      
+
       fxCtx.save()
       fxCtx.beginPath()
       fxCtx.arc(x, y, 60, 0, Math.PI * 2)
@@ -632,6 +670,9 @@
       drawImageCover(fxCtx, newImg, 0, 0, w, h)
       fxCtx.restore()
     }
+
+    // Reset for next transition
+    if (progress >= 1) paintStrokes = null
   }
 
   // ── CSS/DOM transitions ───────────────────────────────────────────────────
@@ -1012,7 +1053,7 @@
       const list = await photosRes.json()
       const cfg  = await configRes.json()
       const poll = await pollingRes.json()
-      Object.assign(pollingConfig, poll)
+      if (poll.photoReloadMinutes) photoReloadMinutes = poll.photoReloadMinutes
       Object.assign(config, cfg)
       document.body.className = 'fit-' + config.fit
       document.documentElement.style.setProperty('--dur', config.interval + 's')
@@ -1027,67 +1068,39 @@
       }
     } catch(e) { console.error('init', e) }
 
-    setInterval(window.reloadPhotos, pollingConfig.photoReloadMinutes * 60 * 1000)
-    
-    // Start polling for show-now commands (remote control)
-    if (!previewFile) {
-      startCommandPolling()
-    }
-  }
+    setInterval(window.reloadPhotos, photoReloadMinutes * 60 * 1000)
 
-  // Poll for show-now commands from manage page
-  async function pollShowNow() {
-    try {
-      const res = await fetch('/api/show-now')
-      const data = await res.json()
-      console.log('[slideshow-poll]', data)
-      
-      if (data.resume) {
-        // Manage page closed lightbox, resume normal slideshow
-        console.log('[slideshow-poll] Resuming slideshow')
-        resumeSlideshow()
-      } else if (data.filename) {
-        console.log('[slideshow-poll] Calling showNow with:', data.filename)
-        await showNow(data.filename)
-      }
-    } catch (e) {
-      console.error('poll show-now', e)
-    }
+    // Connect WebSocket for real-time remote control
+    connectWebSocket()
   }
 
   async function showNow(filename) {
-    console.log('[showNow] START - filename:', filename)
-    console.log('[showNow] Current photos array length:', photos.length)
-    console.log('[showNow] Current queuePos:', queuePos)
-    console.log('[showNow] Current isPaused:', isPaused)
-    
     // Show specific image and PAUSE slideshow (stay on this image)
     if (timer) clearInterval(timer)
     timer = null
     isPaused = true
     const panel = document.getElementById('settings-panel')
     if (panel) panel.classList.add('paused')
-    
+
     // Find the image in our photos array
     const idx = photos.indexOf(filename)
-    console.log('[showNow] Index of', filename, 'in photos:', idx)
-    
     if (idx !== -1) {
       queuePos = idx
-      console.log('[showNow] Found in array, set queuePos to', queuePos)
     } else {
-      // Image not in rotation, add it temporarily as the current image
-      photos.push(filename)
-      queuePos = photos.length - 1
-      console.log('[showNow] Not found, added to array, queuePos now', queuePos)
+      // Not in current list — reload first, then try again
+      await window.reloadPhotos()
+      const idx2 = photos.indexOf(filename)
+      if (idx2 !== -1) {
+        queuePos = idx2
+      } else {
+        // Still not found: add temporarily
+        photos.push(filename)
+        queuePos = photos.length - 1
+      }
     }
-    
-    console.log('[showNow] Calling advance()...')
-    // Show this image and stay on it
     await advance()
-    console.log('[showNow] DONE')
   }
-  
+
   function resumeSlideshow() {
     isPaused = false
     const panel = document.getElementById('settings-panel')
@@ -1095,8 +1108,37 @@
     startTimer()
   }
 
-  function startCommandPolling() {
-    setInterval(pollShowNow, pollingConfig.showNowSeconds * 1000)
+  // ── WebSocket connection ──────────────────────────────────────────────────
+
+  function connectWebSocket() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+    const ws = new WebSocket(`${proto}://${location.host}`)
+
+    ws.addEventListener('message', async (event) => {
+      let msg
+      try { msg = JSON.parse(event.data) } catch { return }
+
+      if (msg.type === 'show-now' && msg.filename) {
+        await showNow(msg.filename)
+      } else if (msg.type === 'resume-slideshow') {
+        resumeSlideshow()
+      } else if (msg.type === 'config' && msg.config) {
+        window.setConfig(msg.config)
+      } else if (msg.type === 'photo-deleted') {
+        photos = photos.filter(p => p !== msg.filename)
+        document.getElementById('empty').classList.toggle('visible', photos.length === 0)
+      }
+      // 'queue' messages are ignored by the slideshow
+    })
+
+    ws.addEventListener('close', () => {
+      // Reconnect after a short delay
+      setTimeout(connectWebSocket, 3000)
+    })
+
+    ws.addEventListener('error', () => {
+      ws.close()
+    })
   }
 
   init()
