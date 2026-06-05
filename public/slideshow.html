@@ -193,6 +193,241 @@
   #settings-panel .s-hint {
     font-size: 0.7rem; color: #444; text-align: center; margin-top: 12px;
   }
+
+  /* Settings layout wrapper — arranges settings panel + info panels */
+  #settings-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    max-width: 98vw;
+    max-height: 96vh;
+  }
+  #settings-layout.layout-col {
+    flex-direction: column;
+  }
+
+  /* Per-media info panels */
+  .info-panel {
+    background: #181818;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 140px;
+    flex-shrink: 0;
+  }
+  .info-panel-thumb {
+    width: 116px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #111;
+    display: block;
+  }
+  .info-panel-name {
+    font-size: 0.72rem;
+    color: #888;
+    text-align: center;
+    word-break: break-all;
+    max-width: 116px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .info-panel-manage {
+    width: 100%;
+    padding: 7px 0;
+    background: #1a4a7a;
+    border: 1px solid #2d7abf;
+    color: #aad4ff;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 7px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .info-panel-manage:hover { background: #1e5a96; }
+
+  /* Auto-close countdown bar */
+  #settings-countdown {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: #2d7abf;
+    border-radius: 0 0 14px 14px;
+    transform-origin: left center;
+    transition: transform 1s linear;
+  }
+
+  /* Manage modal */
+  #manage-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  #manage-modal.open { display: flex; }
+
+  #manage-panel {
+    background: #181818;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    width: min(420px, 92vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  #manage-img-wrap {
+    width: 100%;
+    height: 25vh;
+    min-height: 120px;
+    background: #111;
+    border-radius: 14px 14px 0 0;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  #manage-img-wrap img,
+  #manage-img-wrap video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  #manage-body {
+    padding: 20px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  #manage-panel .m-close {
+    position: absolute;
+    top: 10px; right: 14px;
+    background: rgba(0,0,0,0.55); border: none;
+    color: #ccc; font-size: 1.4rem; cursor: pointer; line-height: 1;
+    border-radius: 50%; width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1;
+  }
+  #manage-panel .m-close:hover { color: #fff; background: rgba(0,0,0,0.8); }
+
+  .m-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .m-row label {
+    font-size: 0.82rem;
+    color: #888;
+    min-width: 72px;
+    flex-shrink: 0;
+  }
+  .m-row span {
+    font-size: 0.88rem;
+    color: #ccc;
+  }
+  .m-row input[type=text] {
+    flex: 1;
+    background: #252525;
+    border: 1px solid #3a3a3a;
+    color: #ddd;
+    font-size: 0.88rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    outline: none;
+  }
+  .m-row input[type=text]:focus { border-color: #4a9eff; }
+
+  .m-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .m-btn-save {
+    flex: 1;
+    padding: 9px;
+    background: #1a4a7a;
+    border: 1px solid #2d7abf;
+    color: #aad4ff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .m-btn-save:hover { background: #1e5a96; }
+  .m-btn-delete {
+    padding: 9px 16px;
+    background: #5a1a1a;
+    border: 1px solid #bf2d2d;
+    color: #ffaaaa;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .m-btn-delete:hover { background: #7a2020; }
+
+  /* Confirm delete dialog */
+  #delete-confirm {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 3000;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  #delete-confirm.open { display: flex; }
+  #delete-confirm-box {
+    background: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    border-radius: 12px;
+    padding: 28px 32px;
+    width: min(340px, 88vw);
+    text-align: center;
+  }
+  #delete-confirm-box p {
+    color: #ccc;
+    font-size: 0.95rem;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  #delete-confirm-box .dc-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  #delete-confirm-box .dc-cancel {
+    padding: 9px 24px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #aaa;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  #delete-confirm-box .dc-cancel:hover { background: #333; }
+  #delete-confirm-box .dc-delete {
+    padding: 9px 24px;
+    background: #7a2020;
+    border: 1px solid #bf2d2d;
+    color: #ffaaaa;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  #delete-confirm-box .dc-delete:hover { background: #962626; }
 </style>
 </head>
 <body class="fit-cover">
@@ -205,73 +440,116 @@
 
 <!-- Settings overlay (long-press) -->
 <div id="settings-overlay">
-  <div id="settings-panel">
-    <h2>Slideshow Settings</h2>
-    <button class="s-close" id="s-close-btn">×</button>
+  <div id="settings-layout">
+    <!-- Info panels injected here by JS -->
+    <div id="settings-panel">
+      <h2>Slideshow Settings</h2>
+      <button class="s-close" id="s-close-btn">×</button>
 
-    <div class="s-row">
-      <label>Interval</label>
-      <input type="range" id="s-interval" min="3" max="120" step="1" style="flex:1">
-      <span class="s-interval-val" id="s-interval-val">10s</span>
-    </div>
-    <div class="s-row">
-      <label>Transition</label>
-      <select id="s-transition">
-        <option value="random">Random</option>
-        <option value="crossfade">Crossfade</option>
-        <option value="slide_left">Slide left</option>
-        <option value="slide_right">Slide right</option>
-        <option value="slide_up">Slide up</option>
-        <option value="slide_down">Slide down</option>
-        <option value="zoom_in">Zoom in</option>
-        <option value="zoom_out">Zoom out</option>
-        <option value="fade_black">Fade through black</option>
-        <option value="wipe">Wipe</option>
-        <option value="curtain">Curtain</option>
-        <option value="rotate_fade">Rotate &amp; fade</option>
-        <option value="flip_h">Flip</option>
-        <option value="iris">Circle iris</option>
-        <option value="diagonal_wipe">Diagonal wipe</option>
-        <option value="clock_wipe">Clock wipe</option>
-        <option value="pixelate">Pixelate</option>
-        <option value="glitch">Glitch</option>
-        <option value="shatter">Shatter</option>
-        <option value="none">None</option>
-      </select>
-    </div>
-    <div class="s-row">
-      <label>Ken Burns</label>
-      <label class="s-toggle">
-        <input type="checkbox" id="s-kenburns">
-        <div class="s-toggle-track"></div>
-      </label>
-    </div>
-    <div class="s-row" id="s-kbspeed-row">
-      <label>KB Speed</label>
-      <select id="s-kbspeed">
-        <option value="normal">Normal</option>
-        <option value="slow">Slow</option>
-        <option value="slowest">Slowest</option>
-      </select>
-    </div>
-    <div class="s-row">
-      <label>Order</label>
-      <select id="s-order">
-        <option value="random">Random</option>
-        <option value="sequential">Sequential</option>
-      </select>
-    </div>
-    <div class="s-row">
-      <label>Fit</label>
-      <select id="s-fit">
-        <option value="cover">Cover (fill)</option>
-        <option value="contain">Contain (letterbox)</option>
-      </select>
-    </div>
+      <div class="s-row">
+        <label>Interval</label>
+        <input type="range" id="s-interval" min="3" max="120" step="1" style="flex:1">
+        <span class="s-interval-val" id="s-interval-val">10s</span>
+      </div>
+      <div class="s-row">
+        <label>Transition</label>
+        <select id="s-transition">
+          <option value="random">Random</option>
+          <option value="crossfade">Crossfade</option>
+          <option value="slide_left">Slide left</option>
+          <option value="slide_right">Slide right</option>
+          <option value="slide_up">Slide up</option>
+          <option value="slide_down">Slide down</option>
+          <option value="zoom_in">Zoom in</option>
+          <option value="zoom_out">Zoom out</option>
+          <option value="fade_black">Fade through black</option>
+          <option value="wipe">Wipe</option>
+          <option value="curtain">Curtain</option>
+          <option value="rotate_fade">Rotate &amp; fade</option>
+          <option value="flip_h">Flip</option>
+          <option value="iris">Circle iris</option>
+          <option value="diagonal_wipe">Diagonal wipe</option>
+          <option value="clock_wipe">Clock wipe</option>
+          <option value="pixelate">Pixelate</option>
+          <option value="glitch">Glitch</option>
+          <option value="shatter">Shatter</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div class="s-row">
+        <label>Ken Burns</label>
+        <label class="s-toggle">
+          <input type="checkbox" id="s-kenburns">
+          <div class="s-toggle-track"></div>
+        </label>
+      </div>
+      <div class="s-row" id="s-kbspeed-row">
+        <label>KB Speed</label>
+        <select id="s-kbspeed">
+          <option value="normal">Normal</option>
+          <option value="slow">Slow</option>
+          <option value="slowest">Slowest</option>
+        </select>
+      </div>
+      <div class="s-row">
+        <label>Order</label>
+        <select id="s-order">
+          <option value="random">Random</option>
+          <option value="sequential">Sequential</option>
+        </select>
+      </div>
+      <div class="s-row">
+        <label>Fit</label>
+        <select id="s-fit">
+          <option value="cover">Cover (fill)</option>
+          <option value="contain">Contain (letterbox)</option>
+        </select>
+      </div>
 
-    <button class="s-resume" id="s-resume-btn">▶ Resume Slideshow</button>
-    <button class="s-save" id="s-save-btn">Save</button>
-    <div class="s-hint">Hold screen to open settings · Changes sync to Home Assistant</div>
+      <button class="s-resume" id="s-resume-btn">▶ Resume Slideshow</button>
+      <button class="s-save" id="s-save-btn">Save</button>
+      <div class="s-hint">Hold screen to open settings · Changes sync to Home Assistant</div>
+      <div id="settings-countdown"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Manage modal -->
+<div id="manage-modal">
+  <div id="manage-panel">
+    <button class="m-close" id="m-close-btn">×</button>
+    <div id="manage-img-wrap">
+      <!-- img or video injected by JS -->
+    </div>
+    <div id="manage-body">
+      <div class="m-row">
+        <label>Title</label>
+        <input type="text" id="m-title" placeholder="Display name">
+      </div>
+      <div class="m-row">
+        <label>Date</label>
+        <span id="m-date">—</span>
+      </div>
+      <div class="m-row">
+        <label>Size</label>
+        <span id="m-size">—</span>
+      </div>
+      <div class="m-actions">
+        <button class="m-btn-save" id="m-save-btn">Save title</button>
+        <button class="m-btn-delete" id="m-delete-btn">🗑 Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirmation dialog -->
+<div id="delete-confirm">
+  <div id="delete-confirm-box">
+    <p>Delete this photo permanently?<br><span id="dc-filename" style="color:#888;font-size:0.82rem"></span></p>
+    <div class="dc-actions">
+      <button class="dc-cancel" id="dc-cancel-btn">Cancel</button>
+      <button class="dc-delete" id="dc-delete-btn">Delete</button>
+    </div>
   </div>
 </div>
 
@@ -291,6 +569,11 @@
   let timer = null
   let slotA, slotB, useA = true
   let isPaused = false
+
+  // Track currently displayed group for info panels
+  let currentGroup = []
+  let currentIsDual = false
+  let currentIsStack = false
 
   // Polling interval for photo list reload (loaded from server config)
   let photoReloadMinutes = 5
@@ -844,6 +1127,11 @@
     const isDual  = group.length > 1
     const isStack = isDual && !screenLandscape()
 
+    // Track for info panels
+    currentGroup   = group
+    currentIsDual  = isDual
+    currentIsStack = isStack
+
     const incoming = useA ? slotA : slotB
     const outgoing = useA ? slotB : slotA
     useA = !useA
@@ -929,6 +1217,69 @@
   const sOrder     = document.getElementById('s-order')
   const sFit       = document.getElementById('s-fit')
 
+  // ── Settings overlay: pause, auto-close, info panels ─────────────────────
+
+  let settingsAutoCloseTimer = null
+  const settingsLayout    = document.getElementById('settings-layout')
+  const settingsCountdown = document.getElementById('settings-countdown')
+
+  function resetSettingsAutoClose() {
+    if (!overlay.classList.contains('open')) return
+    if (settingsAutoCloseTimer) clearTimeout(settingsAutoCloseTimer)
+    // Restart countdown bar animation
+    settingsCountdown.style.transition = 'none'
+    settingsCountdown.style.transform  = 'scaleX(1)'
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      settingsCountdown.style.transition = 'transform 30s linear'
+      settingsCountdown.style.transform  = 'scaleX(0)'
+    }))
+    settingsAutoCloseTimer = setTimeout(() => {
+      closeSettings()
+      if (!isPaused) resumeSlideshow()
+    }, 30000)
+  }
+
+  function buildInfoPanels() {
+    // Remove any existing info panels
+    settingsLayout.querySelectorAll('.info-panel').forEach(p => p.remove())
+    if (!currentGroup.length) return
+
+    // Determine layout direction
+    // Dual side-by-side → row (default); dual stacked → col; single landscape → row; single portrait → col
+    const isRow = currentIsDual ? !currentIsStack : screenLandscape()
+    settingsLayout.classList.toggle('layout-col', !isRow)
+
+    currentGroup.forEach((fn, i) => {
+      const panel = document.createElement('div')
+      panel.className = 'info-panel'
+
+      const thumb = document.createElement('img')
+      thumb.className = 'info-panel-thumb'
+      thumb.src = '/thumbs/' + encodeURIComponent(fn)
+      thumb.onerror = () => { thumb.src = '/photos/' + encodeURIComponent(fn) }
+      panel.appendChild(thumb)
+
+      const name = document.createElement('div')
+      name.className = 'info-panel-name'
+      name.textContent = fn
+      panel.appendChild(name)
+
+      const btn = document.createElement('button')
+      btn.className = 'info-panel-manage'
+      btn.textContent = 'Manage'
+      btn.addEventListener('click', () => openManageModal(fn))
+      panel.appendChild(btn)
+
+      // Insert: for row layout, first item before settings-panel, second after
+      // For col layout, first item before settings-panel, second after
+      if (i === 0) {
+        settingsLayout.insertBefore(panel, document.getElementById('settings-panel'))
+      } else {
+        settingsLayout.appendChild(panel)
+      }
+    })
+  }
+
   function openSettings() {
     sInterval.value = config.interval
     sIntervalV.textContent = config.interval + 's'
@@ -937,13 +1288,32 @@
     sKBSpeed.value  = config.kenBurnsSpeed || 'normal'
     sOrder.value    = config.order
     sFit.value      = config.fit
+
+    // Pause slideshow
+    if (timer) { clearInterval(timer); timer = null }
+
+    buildInfoPanels()
     overlay.classList.add('open')
+    resetSettingsAutoClose()
   }
+
+  function closeSettings() {
+    overlay.classList.remove('open')
+    if (settingsAutoCloseTimer) { clearTimeout(settingsAutoCloseTimer); settingsAutoCloseTimer = null }
+    settingsLayout.querySelectorAll('.info-panel').forEach(p => p.remove())
+    settingsLayout.classList.remove('layout-col')
+  }
+
+  // Reset auto-close timer on any interaction within the overlay
+  overlay.addEventListener('pointerdown', resetSettingsAutoClose)
+  overlay.addEventListener('input',       resetSettingsAutoClose)
+  overlay.addEventListener('change',      resetSettingsAutoClose)
 
   sInterval.addEventListener('input', () => { sIntervalV.textContent = sInterval.value + 's' })
 
   document.getElementById('s-close-btn').addEventListener('click', () => {
-    overlay.classList.remove('open')
+    closeSettings()
+    if (!isPaused) resumeSlideshow()
   })
 
   document.getElementById('s-save-btn').addEventListener('click', async () => {
@@ -963,12 +1333,13 @@
       })
       window.setConfig(newCfg)
     } catch(e) { console.error('save config', e) }
-    overlay.classList.remove('open')
+    closeSettings()
+    resumeSlideshow()
   })
 
   document.getElementById('s-resume-btn').addEventListener('click', () => {
+    closeSettings()
     resumeSlideshow()
-    overlay.classList.remove('open')
   })
 
   // Long-press detection (500ms hold, cancel on >8px movement)
@@ -1089,6 +1460,92 @@
     if (panel) panel.classList.remove('paused')
     startTimer()
   }
+
+  // ── Manage modal ──────────────────────────────────────────────────────────
+
+  const manageModal   = document.getElementById('manage-modal')
+  const manageImgWrap = document.getElementById('manage-img-wrap')
+  const mTitle        = document.getElementById('m-title')
+  const mDate         = document.getElementById('m-date')
+  const mSize         = document.getElementById('m-size')
+  let   manageFilename = null
+
+  function formatBytes(bytes) {
+    if (bytes < 1024)       return bytes + ' B'
+    if (bytes < 1048576)    return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / 1048576).toFixed(1) + ' MB'
+  }
+
+  async function openManageModal(fn) {
+    manageFilename = fn
+    manageImgWrap.innerHTML = ''
+    mTitle.value = ''
+    mDate.textContent = '—'
+    mSize.textContent = '—'
+
+    // Show media preview
+    if (VIDEO_EXTS.test(fn)) {
+      const v = document.createElement('video')
+      v.src = '/photos/' + encodeURIComponent(fn)
+      v.muted = true; v.playsInline = true; v.controls = true
+      manageImgWrap.appendChild(v)
+    } else {
+      const img = document.createElement('img')
+      img.src = '/photos/' + encodeURIComponent(fn)
+      img.alt = fn
+      manageImgWrap.appendChild(img)
+    }
+
+    manageModal.classList.add('open')
+
+    // Fetch info
+    try {
+      const info = await fetch('/api/photos/' + encodeURIComponent(fn) + '/info').then(r => r.json())
+      mTitle.value      = info.displayName || ''
+      mDate.textContent = info.date || '—'
+      mSize.textContent = info.size ? formatBytes(info.size) : '—'
+    } catch(e) { console.error('manage info', e) }
+  }
+
+  function closeManageModal() {
+    manageModal.classList.remove('open')
+    manageImgWrap.innerHTML = ''
+    manageFilename = null
+  }
+
+  document.getElementById('m-close-btn').addEventListener('click', closeManageModal)
+
+  document.getElementById('m-save-btn').addEventListener('click', async () => {
+    if (!manageFilename) return
+    try {
+      await fetch('/api/meta/' + encodeURIComponent(manageFilename), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: mTitle.value.trim() })
+      })
+    } catch(e) { console.error('save title', e) }
+    closeManageModal()
+  })
+
+  document.getElementById('m-delete-btn').addEventListener('click', () => {
+    if (!manageFilename) return
+    document.getElementById('dc-filename').textContent = manageFilename
+    document.getElementById('delete-confirm').classList.add('open')
+  })
+
+  document.getElementById('dc-cancel-btn').addEventListener('click', () => {
+    document.getElementById('delete-confirm').classList.remove('open')
+  })
+
+  document.getElementById('dc-delete-btn').addEventListener('click', async () => {
+    if (!manageFilename) return
+    document.getElementById('delete-confirm').classList.remove('open')
+    try {
+      await fetch('/api/photos/' + encodeURIComponent(manageFilename), { method: 'DELETE' })
+    } catch(e) { console.error('delete', e) }
+    // Reload page to refresh slideshow
+    location.reload()
+  })
 
   // ── WebSocket connection ──────────────────────────────────────────────────
 

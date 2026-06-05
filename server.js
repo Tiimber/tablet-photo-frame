@@ -487,6 +487,36 @@ app.get('/api/version', (req, res) => {
   res.json({ commit: hash })
 })
 
+app.get('/api/photos/:filename/info', (req, res) => {
+  const filename = path.basename(req.params.filename)
+  const filePath = path.join(PHOTOS_DIR, filename)
+  if (!MEDIA_EXTS.has(path.extname(filename).toLowerCase())) {
+    return res.status(400).json({ error: 'Unsupported file type' })
+  }
+  try {
+    const stat = fs.statSync(filePath)
+    const meta = loadMeta()
+    const displayName = meta[filename]?.displayName || ''
+    // Read EXIF date for this single file
+    let date = null
+    try {
+      const et = spawnSync('exiftool', ['-json', '-q',
+        '-DateTimeOriginal', '-CreateDate', '-FileModifyDate', filePath],
+        { timeout: serverConfig.http.timeoutSeconds * 1000 })
+      if (et.status === 0) {
+        const exifList = JSON.parse(et.stdout.toString())
+        if (exifList.length > 0) {
+          const item = exifList[0]
+          const raw = item.DateTimeOriginal || item.CreateDate || item.FileModifyDate || ''
+          const m = raw.match(/^(\d{4}):(\d{2}):(\d{2})/)
+          date = (m && m[1] !== '0000') ? `${m[1]}-${m[2]}-${m[3]}` : null
+        }
+      }
+    } catch { /* exiftool unavailable */ }
+    res.json({ filename, size: stat.size, displayName, date })
+  } catch { res.status(404).json({ error: 'Not found' }) }
+})
+
 app.get('/api/meta', (req, res) => res.json(loadMeta()))
 
 app.patch('/api/meta/:filename', (req, res) => {
