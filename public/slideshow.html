@@ -219,9 +219,7 @@
         <option value="diagonal_wipe">Diagonal wipe</option>
         <option value="clock_wipe">Clock wipe</option>
         <option value="pixelate">Pixelate</option>
-        <option value="ripple">Ripple</option>
         <option value="glitch">Glitch</option>
-        <option value="mosaic">Mosaic</option>
         <option value="shatter">Shatter</option>
         <option value="none">None</option>
       </select>
@@ -259,7 +257,7 @@
   const TRANSITION_LIST = ['crossfade','slide_left','slide_right','slide_up','slide_down',
     'zoom_in','zoom_out','fade_black','wipe','curtain','rotate_fade','flip_h',
     'blinds','iris','diagonal_wipe','clock_wipe',
-    'pixelate','ripple','glitch','mosaic','shatter']
+    'pixelate','glitch','shatter']
 
   const infoCache = {}
   let photos = []
@@ -410,7 +408,7 @@
       if (elem.tagName === 'VIDEO') {
         const vw = elem.videoWidth  || dw
         const vh = elem.videoHeight || dh
-        // cover-fit the video frame into the item rect
+        // Always cover-fit the video frame (ignore object-fit:contain for canvas capture)
         const ar = vw / vh, boxAr = dw / dh
         let sx = 0, sy = 0, sw = vw, sh = vh
         if (ar > boxAr) { sw = vh * boxAr; sx = (vw - sw) / 2 }
@@ -418,7 +416,8 @@
         ctx.drawImage(elem, sx, sy, sw, sh, dx, dy, dw, dh)
       } else {
         // Read the current CSS transform (Ken Burns animation in progress)
-        const matrix = window.getComputedStyle(elem).transform
+        const style = window.getComputedStyle(elem)
+        const matrix = style.transform
         const nw = elem.naturalWidth  || dw
         const nh = elem.naturalHeight || dh
 
@@ -451,6 +450,31 @@
     return off
   }
 
+  /**
+   * Wait for all img/video elements in a slide to be ready to draw.
+   * Returns a Promise that resolves once all media is loaded (or times out after 3s).
+   */
+  function waitForSlideMedia(slide) {
+    const elems = [...slide.querySelectorAll('img, video')]
+    if (!elems.length) return Promise.resolve()
+    const promises = elems.map(elem => new Promise(resolve => {
+      if (elem.tagName === 'IMG') {
+        if (elem.complete && elem.naturalWidth > 0) return resolve()
+        elem.addEventListener('load',  resolve, { once: true })
+        elem.addEventListener('error', resolve, { once: true })
+      } else {
+        // video: readyState >= 2 means we have enough data to draw a frame
+        if (elem.readyState >= 2) return resolve()
+        elem.addEventListener('loadeddata',    resolve, { once: true })
+        elem.addEventListener('canplay',       resolve, { once: true })
+        elem.addEventListener('error',         resolve, { once: true })
+      }
+    }))
+    // Timeout after 3s so we never hang
+    const timeout = new Promise(r => setTimeout(r, 3000))
+    return Promise.race([Promise.all(promises), timeout])
+  }
+
   // Draw elem cover-fitted into destination rect (dx,dy,dw,dh)
   function coverDraw(ctx, elem, sw, sh, dx, dy, dw, dh) {
     const ar = sw / sh, boxAr = dw / dh
@@ -463,7 +487,7 @@
   // ── Canvas-based transitions ──────────────────────────────────────────────
 
   // oldCanvas / newCanvas are HTMLCanvasElement at screen resolution (1:1 pixels)
-  function doCanvasTransition(t, oldCanvas, newCanvas, duration = 1200) {
+  function doCanvasTransition(t, oldCanvas, newCanvas, duration = 1400) {
     const w = fxCanvas.width, h = fxCanvas.height
     fxCanvas.classList.add('active')
 
@@ -524,19 +548,6 @@
     }
   }
 
-  // Ripple: new image fades in with horizontal wave displacement
-  function doRipple(oldC, newC, progress) {
-    const w = fxCanvas.width, h = fxCanvas.height
-    fxCtx.drawImage(oldC, 0, 0)
-    const amplitude = Math.round(18 * (1 - progress))
-    fxCtx.globalAlpha = progress
-    for (let y = 0; y < h; y++) {
-      const offset = Math.round(Math.sin((y / h) * Math.PI * 5 + progress * Math.PI * 2) * amplitude)
-      fxCtx.drawImage(newC, 0, y, w, 1, offset, y, w, 1)
-    }
-    fxCtx.globalAlpha = 1
-  }
-
   // Glitch: horizontal slice displacement, then hard cut to new
   let glitchSlices = null
   function doGlitch(oldC, newC, progress) {
@@ -564,31 +575,6 @@
     } else {
       glitchSlices = null
       fxCtx.drawImage(newC, 0, 0)
-    }
-  }
-
-  // Mosaic: tiles flip from old to new image (card-flip effect per tile)
-  function doMosaic(oldC, newC, progress) {
-    const w = fxCanvas.width, h = fxCanvas.height
-    const cols = 10, rows = 6
-    const tileW = w / cols, tileH = h / rows
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const delay = ((c + r) / (cols + rows - 2)) * 0.65
-        const tp = Math.max(0, Math.min(1, (progress - delay) / 0.35))
-        const x = c * tileW, y = r * tileH
-        fxCtx.save()
-        fxCtx.beginPath(); fxCtx.rect(x, y, tileW, tileH); fxCtx.clip()
-        fxCtx.translate(x + tileW / 2, y + tileH / 2)
-        if (tp < 0.5) {
-          fxCtx.scale(Math.cos(tp * Math.PI), 1)
-          fxCtx.drawImage(oldC, x, y, tileW, tileH, -tileW / 2, -tileH / 2, tileW, tileH)
-        } else {
-          fxCtx.scale(Math.cos((1 - tp) * Math.PI), 1)
-          fxCtx.drawImage(newC, x, y, tileW, tileH, -tileW / 2, -tileH / 2, tileW, tileH)
-        }
-        fxCtx.restore()
-      }
     }
   }
 
@@ -635,15 +621,20 @@
     if (t === 'random') t = TRANSITION_LIST[Math.floor(Math.random() * TRANSITION_LIST.length)]
 
     // Canvas-based transitions
-    const canvasTransitions = ['pixelate', 'ripple', 'glitch', 'mosaic', 'shatter']
+    const canvasTransitions = ['pixelate', 'glitch', 'shatter']
     if (canvasTransitions.includes(t)) {
-      // Capture both slides at screen resolution BEFORE touching DOM visibility
+      // Capture outgoing BEFORE touching DOM (it's currently visible with Ken Burns etc.)
       const oldCanvas = captureSlide(outgoing)
+      // Wait for incoming media to load so newCanvas isn't black
+      await waitForSlideMedia(incoming)
+      // Make incoming briefly visible (opacity:0 but rendered) so captureSlide works
+      incoming.style.cssText = 'opacity:0;transform:none;transition:none'
+      await nextFrame()
       const newCanvas = captureSlide(incoming)
       // Hide both DOM slides while canvas plays
-      incoming.style.cssText = 'opacity:0;transform:none;transition:none'
-      outgoing.style.cssText  = 'opacity:0;transform:none;transition:none'
+      outgoing.style.cssText = 'opacity:0;transform:none;transition:none'
       await doCanvasTransition(t, oldCanvas, newCanvas)
+      // Re-apply Ken Burns animation if needed (it was running on the img before)
       incoming.style.cssText = 'opacity:1;transform:none;transition:none'
       cleanupSlot(outgoing)
       return
@@ -699,9 +690,9 @@
 
     if (t === 'blinds') {
       // Reveal new image through 8 horizontal strips that open top-to-bottom
-      incoming.style.opacity  = '1'
-      incoming.style.clipPath = 'inset(0 0 100% 0)'  // fully hidden
-      outgoing.style.cssText  = 'opacity:1;transition:none'
+      // Reset any stale clip-path from a previous transition on this slot
+      incoming.style.cssText  = 'opacity:1;transform:none;transition:none;clip-path:inset(0 0 100% 0)'
+      outgoing.style.cssText  = 'opacity:1;transform:none;transition:none'
       const strips = 8
       const stripH = 100 / strips
       for (let i = 0; i < strips; i++) {
@@ -737,18 +728,19 @@
     }
 
     if (t === 'diagonal_wipe') {
-      // Use 4-point polygon in both start and end so CSS can interpolate
-      incoming.style.cssText = 'opacity:1;transform:none;transition:none;z-index:2;clip-path:polygon(0% 0%, 0% 0%, 0% 100%, 0% 100%)'
+      // Triangle sweep from top-left corner — true diagonal wipe
+      // 3-point polygon: start collapsed at top-left, expand to cover full screen
+      incoming.style.cssText = 'opacity:1;transform:none;transition:none;z-index:2;clip-path:polygon(0% 0%, 0% 0%, 0% 0%)'
       outgoing.style.cssText = 'opacity:1;transform:none;transition:none;z-index:1'
       await nextFrame()
-      incoming.style.transition = 'clip-path 0.9s ease'
-      incoming.style.clipPath   = 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)'
+      incoming.style.transition = 'clip-path 1.0s ease'
+      incoming.style.clipPath   = 'polygon(0% 0%, 200% 0%, 0% 200%)'
       setTimeout(() => {
         incoming.style.clipPath   = ''
         incoming.style.transition = ''
         incoming.style.zIndex     = ''
         cleanupSlot(outgoing)
-      }, 1000)
+      }, 1100)
       return
     }
 
