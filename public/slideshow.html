@@ -214,7 +214,6 @@
         <option value="curtain">Curtain</option>
         <option value="rotate_fade">Rotate &amp; fade</option>
         <option value="flip_h">Flip</option>
-        <option value="barn_doors">Barn doors</option>
         <option value="blinds">Blinds</option>
         <option value="iris">Circle iris</option>
         <option value="diagonal_wipe">Diagonal wipe</option>
@@ -224,7 +223,6 @@
         <option value="glitch">Glitch</option>
         <option value="mosaic">Mosaic</option>
         <option value="shatter">Shatter</option>
-        <option value="paint_brush">Paint brush</option>
         <option value="none">None</option>
       </select>
     </div>
@@ -260,8 +258,8 @@
   const VIDEO_EXTS = /\.(mp4|mov|webm|m4v)$/i
   const TRANSITION_LIST = ['crossfade','slide_left','slide_right','slide_up','slide_down',
     'zoom_in','zoom_out','fade_black','wipe','curtain','rotate_fade','flip_h',
-    'barn_doors','blinds','iris','diagonal_wipe','clock_wipe',
-    'pixelate','ripple','glitch','mosaic','shatter','paint_brush']
+    'blinds','iris','diagonal_wipe','clock_wipe',
+    'pixelate','ripple','glitch','mosaic','shatter']
 
   const infoCache = {}
   let photos = []
@@ -364,7 +362,7 @@
     return item
   }
 
-  // ── Canvas-based transitions ──────────────────────────────────────────────
+  // ── Canvas capture ────────────────────────────────────────────────────────
 
   const fxCanvas = document.getElementById('fx-canvas')
   const fxCtx = fxCanvas.getContext('2d', { alpha: false })
@@ -376,303 +374,258 @@
   resizeCanvas()
   window.addEventListener('resize', resizeCanvas)
 
-  // Capture a slide element to an Image
-  async function captureSlideToImage(slide) {
-    const mediaItem = slide.querySelector('.media-item')
-    if (!mediaItem) return null
-    const elem = mediaItem.querySelector('img, video')
-    if (!elem) return null
-    
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    if (elem.tagName === 'VIDEO') {
-      const canvas = document.createElement('canvas')
-      canvas.width = elem.videoWidth || window.innerWidth
-      canvas.height = elem.videoHeight || window.innerHeight
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(elem, 0, 0, canvas.width, canvas.height)
-      img.src = canvas.toDataURL()
-    } else {
-      img.src = elem.src
-    }
-    await new Promise((resolve, reject) => {
-      img.onload = resolve
-      img.onerror = reject
-      if (img.complete) resolve()
+  /**
+   * Capture the full rendered slide to an offscreen canvas at screen resolution.
+   * Handles dual-image slides, Ken Burns animated transforms, and videos.
+   * Returns an HTMLCanvasElement with the same dimensions as fxCanvas.
+   */
+  function captureSlide(slide) {
+    const W = fxCanvas.width, H = fxCanvas.height
+    const off = document.createElement('canvas')
+    off.width = W; off.height = H
+    const ctx = off.getContext('2d')
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, W, H)
+
+    const slideRect = slide.getBoundingClientRect()
+    const items = slide.querySelectorAll('.media-item')
+
+    items.forEach(item => {
+      const itemRect = item.getBoundingClientRect()
+      // Position relative to the slide element (which is inset:0 = full screen)
+      const dx = itemRect.left - slideRect.left
+      const dy = itemRect.top  - slideRect.top
+      const dw = itemRect.width
+      const dh = itemRect.height
+      if (dw <= 0 || dh <= 0) return
+
+      const elem = item.querySelector('img, video')
+      if (!elem) return
+
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(dx, dy, dw, dh)
+      ctx.clip()
+
+      if (elem.tagName === 'VIDEO') {
+        const vw = elem.videoWidth  || dw
+        const vh = elem.videoHeight || dh
+        // cover-fit the video frame into the item rect
+        const ar = vw / vh, boxAr = dw / dh
+        let sx = 0, sy = 0, sw = vw, sh = vh
+        if (ar > boxAr) { sw = vh * boxAr; sx = (vw - sw) / 2 }
+        else             { sh = vw / boxAr; sy = (vh - sh) / 2 }
+        ctx.drawImage(elem, sx, sy, sw, sh, dx, dy, dw, dh)
+      } else {
+        // Read the current CSS transform (Ken Burns animation in progress)
+        const matrix = window.getComputedStyle(elem).transform
+        const nw = elem.naturalWidth  || dw
+        const nh = elem.naturalHeight || dh
+
+        if (matrix && matrix !== 'none') {
+          const m = matrix.match(/matrix\(([^)]+)\)/)
+          if (m) {
+            const parts = m[1].split(',').map(Number)
+            // matrix(scaleX, skewY, skewX, scaleY, translateX, translateY)
+            const scaleX = parts[0], scaleY = parts[3]
+            const transX = parts[4], transY = parts[5]
+            // Transform origin is 50% 50% of the element
+            const ox = dx + dw / 2, oy = dy + dh / 2
+            ctx.translate(ox + transX, oy + transY)
+            ctx.scale(scaleX, scaleY)
+            // Draw image cover-fitted into the unscaled item box
+            const ar = nw / nh, boxAr = dw / dh
+            let sx = 0, sy = 0, sw = nw, sh = nh
+            if (ar > boxAr) { sw = nh * boxAr; sx = (nw - sw) / 2 }
+            else             { sh = nw / boxAr; sy = (nh - sh) / 2 }
+            ctx.drawImage(elem, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh)
+          } else {
+            coverDraw(ctx, elem, nw, nh, dx, dy, dw, dh)
+          }
+        } else {
+          coverDraw(ctx, elem, nw, nh, dx, dy, dw, dh)
+        }
+      }
+      ctx.restore()
     })
-    return img
+    return off
   }
 
-  // Draw image to fill canvas maintaining aspect ratio
-  function drawImageCover(ctx, img, x, y, w, h) {
-    const imgAr = img.width / img.height
-    const canvasAr = w / h
-    let sx = 0, sy = 0, sw = img.width, sh = img.height
-    if (imgAr > canvasAr) {
-      sw = img.height * canvasAr
-      sx = (img.width - sw) / 2
-    } else {
-      sh = img.width / canvasAr
-      sy = (img.height - sh) / 2
-    }
-    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
+  // Draw elem cover-fitted into destination rect (dx,dy,dw,dh)
+  function coverDraw(ctx, elem, sw, sh, dx, dy, dw, dh) {
+    const ar = sw / sh, boxAr = dw / dh
+    let sx = 0, sy = 0, srcW = sw, srcH = sh
+    if (ar > boxAr) { srcW = sh * boxAr; sx = (sw - srcW) / 2 }
+    else             { srcH = sw / boxAr; sy = (sh - srcH) / 2 }
+    ctx.drawImage(elem, sx, sy, srcW, srcH, dx, dy, dw, dh)
   }
 
-  async function doCanvasTransition(t, oldImg, newImg, duration = 1200) {
-    const w = fxCanvas.width
-    const h = fxCanvas.height
+  // ── Canvas-based transitions ──────────────────────────────────────────────
+
+  // oldCanvas / newCanvas are HTMLCanvasElement at screen resolution (1:1 pixels)
+  function doCanvasTransition(t, oldCanvas, newCanvas, duration = 1200) {
+    const w = fxCanvas.width, h = fxCanvas.height
     fxCanvas.classList.add('active')
 
-    const startTime = performance.now()
-    
-    function animate() {
-      const elapsed = performance.now() - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      
-      fxCtx.clearRect(0, 0, w, h)
+    return new Promise(resolve => {
+      const startTime = performance.now()
 
-      switch (t) {
-        case 'pixelate':
-          doPixelate(oldImg, newImg, progress)
-          break
-        case 'ripple':
-          doRipple(oldImg, newImg, progress)
-          break
-        case 'glitch':
-          doGlitch(oldImg, newImg, progress)
-          break
-        case 'mosaic':
-          doMosaic(oldImg, newImg, progress)
-          break
-        case 'shatter':
-          doShatter(oldImg, newImg, progress)
-          break
-        case 'paint_brush':
-          doPaintBrush(oldImg, newImg, progress)
-          break
-      }
+      function animate() {
+        const elapsed = performance.now() - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        fxCtx.clearRect(0, 0, w, h)
 
-      if (progress < 1) {
-        requestAnimationFrame(animate)
-      } else {
-        fxCanvas.classList.remove('active')
+        switch (t) {
+          case 'pixelate': doPixelate(oldCanvas, newCanvas, progress); break
+          case 'ripple':   doRipple(oldCanvas, newCanvas, progress);   break
+          case 'glitch':   doGlitch(oldCanvas, newCanvas, progress);   break
+          case 'mosaic':   doMosaic(oldCanvas, newCanvas, progress);   break
+          case 'shatter':  doShatter(oldCanvas, newCanvas, progress);  break
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(animate)
+        } else {
+          fxCanvas.classList.remove('active')
+          resolve()
+        }
       }
-    }
-    animate()
+      animate()
+    })
   }
 
-  function doPixelate(oldImg, newImg, progress) {
+  // Pixelate: old image pixelates out, new image pixelates in
+  function doPixelate(oldC, newC, progress) {
     const w = fxCanvas.width, h = fxCanvas.height
     if (progress < 0.5) {
-      // Pixelate old image progressively
-      const blockSize = Math.floor(1 + progress * 2 * 40)
+      const blockSize = Math.max(2, Math.round(2 + (progress / 0.5) * 58))
       for (let y = 0; y < h; y += blockSize) {
         for (let x = 0; x < w; x += blockSize) {
-          const sx = Math.floor((x / w) * oldImg.width)
-          const sy = Math.floor((y / h) * oldImg.height)
-          const sw = Math.ceil((blockSize / w) * oldImg.width)
-          const sh = Math.ceil((blockSize / h) * oldImg.height)
-          fxCtx.drawImage(oldImg, sx, sy, sw, sh, x, y, blockSize, blockSize)
+          const bw = Math.min(blockSize, w - x)
+          const bh = Math.min(blockSize, h - y)
+          // Sample one pixel from the centre of the block, stretch to fill
+          const cx = Math.min(x + Math.floor(bw / 2), w - 1)
+          const cy = Math.min(y + Math.floor(bh / 2), h - 1)
+          fxCtx.drawImage(oldC, cx, cy, 1, 1, x, y, bw, bh)
         }
       }
     } else {
-      // Un-pixelate new image
-      const p2 = (progress - 0.5) * 2
-      const blockSize = Math.floor(40 - p2 * 40) + 1
+      const p2 = (progress - 0.5) / 0.5
+      const blockSize = Math.max(2, Math.round(60 - p2 * 58))
       for (let y = 0; y < h; y += blockSize) {
         for (let x = 0; x < w; x += blockSize) {
-          const sx = Math.floor((x / w) * newImg.width)
-          const sy = Math.floor((y / h) * newImg.height)
-          const sw = Math.ceil((blockSize / w) * newImg.width)
-          const sh = Math.ceil((blockSize / h) * newImg.height)
-          fxCtx.drawImage(newImg, sx, sy, sw, sh, x, y, blockSize, blockSize)
+          const bw = Math.min(blockSize, w - x)
+          const bh = Math.min(blockSize, h - y)
+          const cx = Math.min(x + Math.floor(bw / 2), w - 1)
+          const cy = Math.min(y + Math.floor(bh / 2), h - 1)
+          fxCtx.drawImage(newC, cx, cy, 1, 1, x, y, bw, bh)
         }
       }
     }
   }
 
-  function doRipple(oldImg, newImg, progress) {
+  // Ripple: new image fades in with horizontal wave displacement
+  function doRipple(oldC, newC, progress) {
     const w = fxCanvas.width, h = fxCanvas.height
-    drawImageCover(fxCtx, oldImg, 0, 0, w, h)
-    
-    const waveCount = 3
-    const amplitude = 12
-    const frequency = Math.PI * waveCount
-    
+    fxCtx.drawImage(oldC, 0, 0)
+    const amplitude = Math.round(18 * (1 - progress))
     fxCtx.globalAlpha = progress
-    const offscreen = document.createElement('canvas')
-    offscreen.width = w; offscreen.height = h
-    const octx = offscreen.getContext('2d')
-    drawImageCover(octx, newImg, 0, 0, w, h)
-    
     for (let y = 0; y < h; y++) {
-      const offset = Math.sin((y / h) * frequency + progress * Math.PI * 2) * amplitude * (1 - progress)
-      fxCtx.drawImage(offscreen, 0, y, w, 1, offset, y, w, 1)
+      const offset = Math.round(Math.sin((y / h) * Math.PI * 5 + progress * Math.PI * 2) * amplitude)
+      fxCtx.drawImage(newC, 0, y, w, 1, offset, y, w, 1)
     }
     fxCtx.globalAlpha = 1
   }
 
-  // Pre-computed glitch slice data
+  // Glitch: horizontal slice displacement, then hard cut to new
   let glitchSlices = null
-
-  function doGlitch(oldImg, newImg, progress) {
+  function doGlitch(oldC, newC, progress) {
     const w = fxCanvas.width, h = fxCanvas.height
-
-    // Pre-compute slice positions once
     if (!glitchSlices) {
-      glitchSlices = Array.from({ length: 8 }, () => ({
-        y:      Math.random() * h,
-        sliceH: 20 + Math.random() * 40,
-        offset: (Math.random() - 0.5) * 60
+      glitchSlices = Array.from({ length: 12 }, () => ({
+        y:      Math.floor(Math.random() * h),
+        sliceH: Math.floor(8 + Math.random() * 48),
+        offset: Math.round((Math.random() - 0.5) * 90)
       }))
     }
-
-    if (progress < 0.3) {
-      // Draw old image to an offscreen canvas first, then sample slices from it
-      const off = document.createElement('canvas')
-      off.width = w; off.height = h
-      const octx = off.getContext('2d')
-      drawImageCover(octx, oldImg, 0, 0, w, h)
-
-      fxCtx.drawImage(off, 0, 0)
+    if (progress < 0.4) {
+      fxCtx.drawImage(oldC, 0, 0)
       for (const { y, sliceH, offset } of glitchSlices) {
-        fxCtx.drawImage(off, 0, y, w, sliceH, offset, y, w, sliceH)
+        const sh = Math.min(sliceH, h - y); if (sh <= 0) continue
+        fxCtx.drawImage(oldC, 0, y, w, sh, offset, y, w, sh)
+      }
+    } else if (progress < 0.6) {
+      const p = (progress - 0.4) / 0.2
+      fxCtx.drawImage(p < 0.5 ? oldC : newC, 0, 0)
+      for (const { y, sliceH, offset } of glitchSlices) {
+        const sh = Math.min(sliceH, h - y); if (sh <= 0) continue
+        fxCtx.drawImage(newC, 0, y, w, sh, Math.round(offset * (1 - p)), y, w, sh)
       }
     } else {
-      glitchSlices = null  // reset for next call
-      drawImageCover(fxCtx, newImg, 0, 0, w, h)
+      glitchSlices = null
+      fxCtx.drawImage(newC, 0, 0)
     }
   }
 
-  function doMosaic(oldImg, newImg, progress) {
+  // Mosaic: tiles flip from old to new image (card-flip effect per tile)
+  function doMosaic(oldC, newC, progress) {
     const w = fxCanvas.width, h = fxCanvas.height
     const cols = 10, rows = 6
     const tileW = w / cols, tileH = h / rows
-    
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const delay = ((c + r) / (cols + rows)) * 0.7
-        const tileProgress = Math.max(0, Math.min(1, (progress - delay) / 0.3))
-        
+        const delay = ((c + r) / (cols + rows - 2)) * 0.65
+        const tp = Math.max(0, Math.min(1, (progress - delay) / 0.35))
         const x = c * tileW, y = r * tileH
-        const sx = (c / cols) * oldImg.width, sy = (r / rows) * oldImg.height
-        const sw = oldImg.width / cols, sh = oldImg.height / rows
-        const nsx = (c / cols) * newImg.width, nsy = (r / rows) * newImg.height
-        const nsw = newImg.width / cols, nsh = newImg.height / rows
-        
         fxCtx.save()
+        fxCtx.beginPath(); fxCtx.rect(x, y, tileW, tileH); fxCtx.clip()
         fxCtx.translate(x + tileW / 2, y + tileH / 2)
-        
-        const angle = tileProgress * Math.PI
-        fxCtx.rotate(angle)
-        
-        if (tileProgress < 0.5) {
-          const scale = Math.cos(angle)
-          fxCtx.scale(Math.abs(scale), 1)
-          fxCtx.drawImage(oldImg, sx, sy, sw, sh, -tileW / 2, -tileH / 2, tileW, tileH)
+        if (tp < 0.5) {
+          fxCtx.scale(Math.cos(tp * Math.PI), 1)
+          fxCtx.drawImage(oldC, x, y, tileW, tileH, -tileW / 2, -tileH / 2, tileW, tileH)
         } else {
-          const scale = -Math.cos(angle)
-          fxCtx.scale(Math.abs(scale), 1)
-          fxCtx.drawImage(newImg, nsx, nsy, nsw, nsh, -tileW / 2, -tileH / 2, tileW, tileH)
+          fxCtx.scale(Math.cos((1 - tp) * Math.PI), 1)
+          fxCtx.drawImage(newC, x, y, tileW, tileH, -tileW / 2, -tileH / 2, tileW, tileH)
         }
-        
         fxCtx.restore()
       }
     }
   }
 
-  // Pre-computed shatter piece data (regenerated each transition call)
+  // Shatter: old image breaks into pieces that fly off, new image fades in underneath
   let shatterPieces = null
-
-  function doShatter(oldImg, newImg, progress) {
+  function doShatter(oldC, newC, progress) {
     const w = fxCanvas.width, h = fxCanvas.height
-
-    // Pre-compute piece trajectories once at the start of the transition
     if (!shatterPieces) {
-      const pieces = 20
-      shatterPieces = []
-      for (let i = 0; i < pieces; i++) {
-        shatterPieces.push({
-          px: (i % 5) * (w / 5),
-          py: Math.floor(i / 5) * (h / 4),
-          pw: w / 5,
-          ph: h / 4,
-          vx: (Math.random() - 0.5) * 300,
-          vy: -200 + Math.random() * 100,
-          rot: (Math.random() - 0.5) * Math.PI
-        })
-      }
+      shatterPieces = Array.from({ length: 20 }, (_, i) => ({
+        px: (i % 5) * (w / 5), py: Math.floor(i / 5) * (h / 4),
+        pw: w / 5, ph: h / 4,
+        vx: (Math.random() - 0.5) * 300,
+        vy: -180 + Math.random() * 80,
+        rot: (Math.random() - 0.5) * Math.PI
+      }))
     }
-
-    if (progress < 0.3) {
-      drawImageCover(fxCtx, oldImg, 0, 0, w, h)
-    } else if (progress < 0.7) {
-      // Shatter old into pieces that fly away
-      const p = (progress - 0.3) / 0.4
-      for (const piece of shatterPieces) {
-        const { px, py, pw, ph, vx, vy, rot } = piece
+    if (progress < 0.25) {
+      fxCtx.drawImage(oldC, 0, 0)
+    } else if (progress < 0.75) {
+      const p = (progress - 0.25) / 0.5
+      // New image fades in as background
+      fxCtx.globalAlpha = p
+      fxCtx.drawImage(newC, 0, 0)
+      fxCtx.globalAlpha = 1
+      // Pieces fly off
+      for (const { px, py, pw, ph, vx, vy, rot } of shatterPieces) {
         fxCtx.save()
         fxCtx.translate(px + pw / 2 + vx * p, py + ph / 2 + vy * p)
         fxCtx.rotate(rot * p)
         fxCtx.globalAlpha = 1 - p
-        const sx = (px / w) * oldImg.width, sy = (py / h) * oldImg.height
-        const sw = (pw / w) * oldImg.width, sh = (ph / h) * oldImg.height
-        fxCtx.drawImage(oldImg, sx, sy, sw, sh, -pw / 2, -ph / 2, pw, ph)
+        fxCtx.drawImage(oldC, px, py, pw, ph, -pw / 2, -ph / 2, pw, ph)
         fxCtx.restore()
       }
     } else {
-      shatterPieces = null  // reset for next call
-      // Fade in new
-      const p = (progress - 0.7) / 0.3
-      fxCtx.globalAlpha = p
-      drawImageCover(fxCtx, newImg, 0, 0, w, h)
-      fxCtx.globalAlpha = 1
+      shatterPieces = null
+      fxCtx.drawImage(newC, 0, 0)
     }
-  }
-
-  // Pre-computed paint brush stroke data
-  let paintStrokes = null
-
-  function doPaintBrush(oldImg, newImg, progress) {
-    const w = fxCanvas.width, h = fxCanvas.height
-
-    // Pre-compute stroke endpoints once
-    if (!paintStrokes) {
-      const strokes = 30
-      paintStrokes = Array.from({ length: strokes }, (_, i) => {
-        const startX = (i / strokes) * w
-        const startY = Math.random() * h
-        return {
-          startX,
-          startY,
-          endX: startX + w * 0.15,
-          endY: startY + (Math.random() - 0.5) * h * 0.3
-        }
-      })
-    }
-
-    drawImageCover(fxCtx, oldImg, 0, 0, w, h)
-    fxCtx.globalCompositeOperation = 'source-over'
-
-    const strokes = paintStrokes.length
-    for (let i = 0; i < strokes; i++) {
-      const strokeProgress = Math.max(0, Math.min(1, (progress - i / strokes) / (1 / strokes)))
-      if (strokeProgress <= 0) continue
-
-      const { startX, startY, endX, endY } = paintStrokes[i]
-      const x = startX + (endX - startX) * strokeProgress
-      const y = startY + (endY - startY) * strokeProgress
-
-      fxCtx.save()
-      fxCtx.beginPath()
-      fxCtx.arc(x, y, 60, 0, Math.PI * 2)
-      fxCtx.clip()
-      drawImageCover(fxCtx, newImg, 0, 0, w, h)
-      fxCtx.restore()
-    }
-
-    // Reset for next transition
-    if (progress >= 1) paintStrokes = null
   }
 
   // ── CSS/DOM transitions ───────────────────────────────────────────────────
@@ -682,26 +635,22 @@
     if (t === 'random') t = TRANSITION_LIST[Math.floor(Math.random() * TRANSITION_LIST.length)]
 
     // Canvas-based transitions
-    const canvasTransitions = ['pixelate', 'ripple', 'glitch', 'mosaic', 'shatter', 'paint_brush']
+    const canvasTransitions = ['pixelate', 'ripple', 'glitch', 'mosaic', 'shatter']
     if (canvasTransitions.includes(t)) {
+      // Capture both slides at screen resolution BEFORE touching DOM visibility
+      const oldCanvas = captureSlide(outgoing)
+      const newCanvas = captureSlide(incoming)
+      // Hide both DOM slides while canvas plays
       incoming.style.cssText = 'opacity:0;transform:none;transition:none'
-      outgoing.style.cssText = 'opacity:1;transform:none;transition:none'
-      
-      const oldImg = await captureSlideToImage(outgoing)
-      const newImg = await captureSlideToImage(incoming)
-      
-      if (oldImg && newImg) {
-        await doCanvasTransition(t, oldImg, newImg)
-      }
-      
-      outgoing.style.cssText = 'opacity:0;transform:none;transition:none'
+      outgoing.style.cssText  = 'opacity:0;transform:none;transition:none'
+      await doCanvasTransition(t, oldCanvas, newCanvas)
       incoming.style.cssText = 'opacity:1;transform:none;transition:none'
       cleanupSlot(outgoing)
       return
     }
 
     // Set incoming initial state
-    const noMotion = { none: 1, wipe: 1, curtain: 1, fade_black: 1, flip_h: 1, barn_doors: 1, blinds: 1, iris: 1, diagonal_wipe: 1, clock_wipe: 1 }
+    const noMotion = { none:1, wipe:1, curtain:1, fade_black:1, flip_h:1, blinds:1, iris:1, diagonal_wipe:1, clock_wipe:1 }
     if (!noMotion[t]) {
       const initialTransform = {
         slide_left:  'translateX(100%)',
@@ -721,107 +670,112 @@
 
     if (t === 'none') {
       incoming.style.cssText = 'opacity:1;transform:none;transition:none'
-      outgoing.style.cssText = 'opacity:0;transform:none;transition:none'
+      outgoing.style.cssText  = 'opacity:0;transform:none;transition:none'
       cleanupSlot(outgoing)
       return
     }
 
     if (t === 'wipe') {
       incoming.style.clipPath = 'inset(0 100% 0 0)'
-      incoming.style.opacity = '1'
+      incoming.style.opacity  = '1'
       await nextFrame()
       incoming.style.transition = 'clip-path 0.9s ease'
-      incoming.style.clipPath = 'inset(0 0% 0 0)'
-      outgoing.style.cssText = 'opacity:1;transition:none'
+      incoming.style.clipPath   = 'inset(0 0% 0 0)'
+      outgoing.style.cssText    = 'opacity:1;transition:none'
       setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1000)
       return
     }
 
     if (t === 'curtain') {
       incoming.style.clipPath = 'inset(0 50%)'
-      incoming.style.opacity = '1'
+      incoming.style.opacity  = '1'
       await nextFrame()
       incoming.style.transition = 'clip-path 0.9s ease'
-      incoming.style.clipPath = 'inset(0 0%)'
-      outgoing.style.cssText = 'opacity:1;transition:none'
-      setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1000)
-      return
-    }
-
-    if (t === 'barn_doors') {
-      incoming.style.clipPath = 'inset(0 50% 0 50%)'
-      incoming.style.opacity = '1'
-      await nextFrame()
-      incoming.style.transition = 'clip-path 0.9s ease'
-      incoming.style.clipPath = 'inset(0 0% 0 0%)'
-      outgoing.style.cssText = 'opacity:1;transition:none'
+      incoming.style.clipPath   = 'inset(0 0%)'
+      outgoing.style.cssText    = 'opacity:1;transition:none'
       setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1000)
       return
     }
 
     if (t === 'blinds') {
-      incoming.style.opacity = '1'
+      // Reveal new image through 8 horizontal strips that open top-to-bottom
+      incoming.style.opacity  = '1'
+      incoming.style.clipPath = 'inset(0 0 100% 0)'  // fully hidden
+      outgoing.style.cssText  = 'opacity:1;transition:none'
       const strips = 8
+      const stripH = 100 / strips
       for (let i = 0; i < strips; i++) {
-        const top = (i / strips) * 100
-        const bottom = ((strips - i - 1) / strips) * 100
         setTimeout(() => {
-          incoming.style.clipPath = `inset(${top}% 0 ${bottom}% 0)`
-        }, i * 80)
+          // Each strip reveals from the top edge down to the bottom of strip i
+          const revealedBottom = 100 - (i + 1) * stripH
+          incoming.style.transition = 'clip-path 0.12s ease'
+          incoming.style.clipPath   = `inset(0 0 ${revealedBottom}% 0)`
+        }, i * 100)
       }
-      await new Promise(r => setTimeout(r, strips * 80 + 200))
-      incoming.style.clipPath = ''
+      const totalMs = strips * 100 + 150
+      await new Promise(r => setTimeout(r, totalMs))
+      incoming.style.clipPath   = ''
+      incoming.style.transition = ''
       cleanupSlot(outgoing)
       return
     }
 
     if (t === 'iris') {
-      incoming.style.clipPath = 'circle(0% at 50% 50%)'
-      incoming.style.opacity = '1'
+      // Ensure incoming is on top by setting a higher z-index temporarily
+      incoming.style.cssText = 'opacity:1;transform:none;transition:none;z-index:2;clip-path:circle(0% at 50% 50%)'
+      outgoing.style.cssText = 'opacity:1;transform:none;transition:none;z-index:1'
       await nextFrame()
       incoming.style.transition = 'clip-path 1.0s ease'
-      incoming.style.clipPath = 'circle(100% at 50% 50%)'
-      outgoing.style.cssText = 'opacity:1;transition:none'
-      setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1100)
+      incoming.style.clipPath   = 'circle(75% at 50% 50%)'
+      setTimeout(() => {
+        incoming.style.clipPath   = ''
+        incoming.style.transition = ''
+        incoming.style.zIndex     = ''
+        cleanupSlot(outgoing)
+      }, 1100)
       return
     }
 
     if (t === 'diagonal_wipe') {
-      incoming.style.clipPath = 'polygon(0 0, 0 0, 0 100%)'
-      incoming.style.opacity = '1'
+      // Use 4-point polygon in both start and end so CSS can interpolate
+      incoming.style.cssText = 'opacity:1;transform:none;transition:none;z-index:2;clip-path:polygon(0% 0%, 0% 0%, 0% 100%, 0% 100%)'
+      outgoing.style.cssText = 'opacity:1;transform:none;transition:none;z-index:1'
       await nextFrame()
       incoming.style.transition = 'clip-path 0.9s ease'
-      incoming.style.clipPath = 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'
-      outgoing.style.cssText = 'opacity:1;transition:none'
-      setTimeout(() => { incoming.style.clipPath = ''; cleanupSlot(outgoing) }, 1000)
+      incoming.style.clipPath   = 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)'
+      setTimeout(() => {
+        incoming.style.clipPath   = ''
+        incoming.style.transition = ''
+        incoming.style.zIndex     = ''
+        cleanupSlot(outgoing)
+      }, 1000)
       return
     }
 
     if (t === 'clock_wipe') {
-      // Sweep clockwise using polygon
-      const steps = 60
-      let angle = 0
+      incoming.style.cssText = 'opacity:1;transform:none;transition:none;z-index:2;clip-path:polygon(50% 50%, 50% 0%, 50% 0%)'
+      outgoing.style.cssText = 'opacity:1;transform:none;transition:none;z-index:1'
+      const steps = 72  // 5° per step
+      let step = 0
       const interval = setInterval(() => {
-        angle += (360 / steps)
-        const rad = (angle - 90) * Math.PI / 180
-        const x = 50 + 50 * Math.cos(rad)
-        const y = 50 + 50 * Math.sin(rad)
-        if (angle <= 90) {
-          incoming.style.clipPath = `polygon(50% 50%, 50% 0%, ${x}% ${y}%)`
-        } else if (angle <= 180) {
-          incoming.style.clipPath = `polygon(50% 50%, 50% 0%, 100% 0%, ${x}% ${y}%)`
-        } else if (angle <= 270) {
-          incoming.style.clipPath = `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, ${x}% ${y}%)`
-        } else {
-          incoming.style.clipPath = `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, ${x}% ${y}%)`
-        }
-        if (angle >= 360) {
+        step++
+        const angle = (step / steps) * 360
+        const rad   = (angle - 90) * Math.PI / 180
+        const x = 50 + 60 * Math.cos(rad)
+        const y = 50 + 60 * Math.sin(rad)
+        let poly
+        if      (angle <= 90)  poly = `polygon(50% 50%, 50% 0%, ${x}% ${y}%)`
+        else if (angle <= 180) poly = `polygon(50% 50%, 50% 0%, 100% 0%, ${x}% ${y}%)`
+        else if (angle <= 270) poly = `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, ${x}% ${y}%)`
+        else                   poly = `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, ${x}% ${y}%)`
+        incoming.style.clipPath = poly
+        if (step >= steps) {
           clearInterval(interval)
-          incoming.style.clipPath = ''
+          incoming.style.clipPath   = ''
+          incoming.style.zIndex     = ''
           cleanupSlot(outgoing)
         }
-      }, 15)
-      incoming.style.opacity = '1'
+      }, 14)
       return
     }
 
@@ -855,7 +809,7 @@
     } else {
       // zoom_in, zoom_out, rotate_fade, crossfade
       incoming.style.cssText = 'opacity:1;transform:none;transition:opacity 1.1s ease,transform 1.1s ease'
-      outgoing.style.cssText = 'opacity:0;transform:none;transition:opacity 0.8s ease'
+      outgoing.style.cssText  = 'opacity:0;transform:none;transition:opacity 0.8s ease'
       setTimeout(() => cleanupSlot(outgoing), 1200)
     }
   }
@@ -891,7 +845,7 @@
   function cleanupSlot(slot) {
     slot.querySelectorAll('video').forEach(v => v.pause())
     slot.innerHTML = ''
-    slot.style.cssText = 'opacity:0;transform:none;transition:none;clip-path:none'
+    slot.style.cssText = 'opacity:0;transform:none;transition:none;clip-path:none;z-index:auto'
   }
 
   // ── Timer & public API ────────────────────────────────────────────────────
@@ -1024,21 +978,15 @@
     // Check for preview mode
     const params = new URLSearchParams(window.location.search)
     const previewFile = params.get('preview')
-    
+
     if (previewFile) {
-      // Preview mode: show only this image, no rotation, ESC to close
       try {
         const cfg = await fetch('/api/config').then(r => r.json())
         Object.assign(config, cfg)
         document.body.className = 'fit-' + config.fit
-        
         photos = [previewFile]
         await advance()
-        
-        // Add ESC key handler to close window
-        document.addEventListener('keydown', e => {
-          if (e.key === 'Escape') window.close()
-        })
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') window.close() })
       } catch(e) { console.error('preview init', e) }
       return
     }
@@ -1075,25 +1023,21 @@
   }
 
   async function showNow(filename) {
-    // Show specific image and PAUSE slideshow (stay on this image)
     if (timer) clearInterval(timer)
     timer = null
     isPaused = true
     const panel = document.getElementById('settings-panel')
     if (panel) panel.classList.add('paused')
 
-    // Find the image in our photos array
     const idx = photos.indexOf(filename)
     if (idx !== -1) {
       queuePos = idx
     } else {
-      // Not in current list — reload first, then try again
       await window.reloadPhotos()
       const idx2 = photos.indexOf(filename)
       if (idx2 !== -1) {
         queuePos = idx2
       } else {
-        // Still not found: add temporarily
         photos.push(filename)
         queuePos = photos.length - 1
       }
@@ -1128,17 +1072,10 @@
         photos = photos.filter(p => p !== msg.filename)
         document.getElementById('empty').classList.toggle('visible', photos.length === 0)
       }
-      // 'queue' messages are ignored by the slideshow
     })
 
-    ws.addEventListener('close', () => {
-      // Reconnect after a short delay
-      setTimeout(connectWebSocket, 3000)
-    })
-
-    ws.addEventListener('error', () => {
-      ws.close()
-    })
+    ws.addEventListener('close', () => { setTimeout(connectWebSocket, 3000) })
+    ws.addEventListener('error', () => { ws.close() })
   }
 
   init()
