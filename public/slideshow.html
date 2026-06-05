@@ -998,6 +998,11 @@
   // ── Init ──────────────────────────────────────────────────────────────────
 
   async function init() {
+    // Log server commit hash for version verification
+    fetch('/api/version').then(r => r.json()).then(v => {
+      console.log('%c[slideshow] server commit: ' + v.commit, 'color:#4af;font-weight:bold')
+    }).catch(() => {})
+
     slotA = document.createElement('div')
     slotB = document.createElement('div')
     slotA.className = slotB.className = 'slide'
@@ -1035,6 +1040,9 @@
       Object.assign(config, cfg)
       document.body.className = 'fit-' + config.fit
       document.documentElement.style.setProperty('--dur', config.interval + 's')
+
+      // Cache dates from initial photo list
+      list.forEach(f => { if (f.name && f.date !== undefined) dateCache[f.name] = f.date || null })
 
       if (config.order === 'random') shuffle(list)
       photos = list.map(f => f.name || f)

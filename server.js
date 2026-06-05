@@ -481,6 +481,12 @@ app.use((err, req, res, next) => {
   res.status(400).json({ error: msg })
 })
 
+app.get('/api/version', (req, res) => {
+  const result = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname })
+  const hash = result.status === 0 ? result.stdout.toString().trim() : 'unknown'
+  res.json({ commit: hash })
+})
+
 app.get('/api/meta', (req, res) => res.json(loadMeta()))
 
 app.patch('/api/meta/:filename', (req, res) => {
