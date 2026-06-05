@@ -1255,8 +1255,13 @@
 
       const thumb = document.createElement('img')
       thumb.className = 'info-panel-thumb'
-      thumb.src = '/thumbs/' + encodeURIComponent(fn)
-      thumb.onerror = () => { thumb.src = '/photos/' + encodeURIComponent(fn) }
+      // Videos don't have thumbs — use the photo URL directly (browser will show first frame)
+      if (VIDEO_EXTS.test(fn)) {
+        thumb.src = '/photos/' + encodeURIComponent(fn)
+      } else {
+        thumb.src = '/thumbs/' + encodeURIComponent(fn)
+        thumb.onerror = () => { thumb.src = '/photos/' + encodeURIComponent(fn) }
+      }
       panel.appendChild(thumb)
 
       const name = document.createElement('div')
@@ -1289,8 +1294,9 @@
     sOrder.value    = config.order
     sFit.value      = config.fit
 
-    // Pause slideshow
+    // Pause slideshow timer and any playing background videos
     if (timer) { clearInterval(timer); timer = null }
+    document.querySelectorAll('.slide video').forEach(v => v.pause())
 
     buildInfoPanels()
     overlay.classList.add('open')
@@ -1302,6 +1308,8 @@
     if (settingsAutoCloseTimer) { clearTimeout(settingsAutoCloseTimer); settingsAutoCloseTimer = null }
     settingsLayout.querySelectorAll('.info-panel').forEach(p => p.remove())
     settingsLayout.classList.remove('layout-col')
+    // Resume any paused background videos
+    document.querySelectorAll('.slide video').forEach(v => v.play().catch(() => {}))
   }
 
   // Reset auto-close timer on any interaction within the overlay
@@ -1480,6 +1488,7 @@
     manageFilename = fn
     manageImgWrap.innerHTML = ''
     mTitle.value = ''
+    mTitle.placeholder = fn   // use filename as placeholder instead of generic text
     mDate.textContent = '—'
     mSize.textContent = '—'
 
