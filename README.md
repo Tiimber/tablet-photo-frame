@@ -31,6 +31,7 @@ A full-featured photo and video slideshow system with web-based management inter
 
 3. Create configuration files:
    - `config.json` - Slideshow settings
+   - `server.config.json` - Server settings (port, upload limits, polling intervals)
    - `ha_sync.json` - Home Assistant connection details (optional)
 
 4. Start the server:
@@ -61,19 +62,62 @@ A full-featured photo and video slideshow system with web-based management inter
 }
 ```
 
+#### server.config.json (optional)
+```json
+{
+  "port": 3000,
+  "upload": {
+    "maxSizeMB": 1024,
+    "imageMagickMemoryMB": 200,
+    "imageMagickMapMB": 400
+  },
+  "polling": {
+    "photoReloadMinutes": 5,
+    "showNowSeconds": 2,
+    "queueInitialMs": 1200,
+    "queueActiveMs": 2000,
+    "queueErrorMs": 3000
+  },
+  "http": {
+    "timeoutSeconds": 10
+  },
+  "paths": {
+    "photos": "./photos",
+    "videos": "./videos",
+    "pending": "./pending",
+    "thumbs": "./thumbs",
+    "public": "./public"
+  }
+}
+```
+
+**Configuration Options:**
+- `port`: Server port (can also be set via `PORT` environment variable)
+- `upload.maxSizeMB`: Maximum file upload size in megabytes
+- `upload.imageMagickMemoryMB`: ImageMagick memory limit for processing large images
+- `upload.imageMagickMapMB`: ImageMagick map limit
+- `polling.photoReloadMinutes`: How often slideshow checks for new photos
+- `polling.showNowSeconds`: Polling interval for remote control commands
+- `polling.queueInitialMs`: Initial delay before checking processing queue
+- `polling.queueActiveMs`: Polling interval while files are processing
+- `polling.queueErrorMs`: Polling interval after an error
+- `http.timeoutSeconds`: HTTP timeout for external requests (e.g., Home Assistant)
+- `paths.*`: Directory paths for media storage (relative to project root)
+
 ## Project Structure
 
 ```
 tablet-photo-frame/
-├── server.js           # Express server with media handling
-├── package.json        # Node dependencies
-├── config.json         # Slideshow configuration
-├── ha_sync.json        # Home Assistant config
+├── server.js              # Express server with media handling
+├── package.json           # Node dependencies
+├── config.json            # Slideshow configuration
+├── server.config.json     # Server configuration (port, limits, polling)
+├── ha_sync.json           # Home Assistant config
 ├── public/
-│   ├── manage.html     # Management interface
-│   └── slideshow.html  # Full-screen slideshow
-├── photos/             # Uploaded images (gitignored)
-├── videos/             # Uploaded videos (gitignored)
+│   ├── manage.html        # Management interface
+│   └── slideshow.html     # Full-screen slideshow
+├── photos/                # Uploaded images (gitignored)
+├── videos/                # Uploaded videos (gitignored)
 └── .gitignore
 ```
 
@@ -86,6 +130,7 @@ tablet-photo-frame/
 - `DELETE /api/photos/:name` - Delete media
 - `GET /api/config` - Get slideshow config
 - `POST /api/config` - Update slideshow config
+- `GET /api/config/polling` - Get polling intervals (used by frontend)
 - `POST /api/show-now` - Remote control: show specific image
 - `GET /api/show-now` - Poll for remote control commands
 - `POST /api/resume-slideshow` - Resume after show-now
@@ -114,7 +159,9 @@ To run locally:
 node server.js
 ```
 
-The server runs on port 3000 by default. Access:
+The server runs on port 3000 by default (configurable in `server.config.json` or via `PORT` environment variable).
+
+Access:
 - Management: `http://localhost:3000/`
 - Slideshow: `http://localhost:3000/slideshow`
 

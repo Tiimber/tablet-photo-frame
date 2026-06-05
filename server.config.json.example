@@ -1,0 +1,25 @@
+{
+  "port": 3000,
+  "upload": {
+    "maxSizeMB": 1024,
+    "imageMagickMemoryMB": 200,
+    "imageMagickMapMB": 400
+  },
+  "polling": {
+    "photoReloadMinutes": 5,
+    "showNowSeconds": 2,
+    "queueInitialMs": 1200,
+    "queueActiveMs": 2000,
+    "queueErrorMs": 3000
+  },
+  "http": {
+    "timeoutSeconds": 10
+  },
+  "paths": {
+    "photos": "./photos",
+    "videos": "./videos",
+    "pending": "./pending",
+    "thumbs": "./thumbs",
+    "public": "./public"
+  }
+}

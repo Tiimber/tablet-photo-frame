@@ -271,6 +271,12 @@
   let timer = null
   let slotA, slotB, useA = true
   let isPaused = false
+  
+  // Polling intervals (loaded from server config)
+  let pollingConfig = {
+    photoReloadMinutes: 5,
+    showNowSeconds: 2
+  }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -998,12 +1004,15 @@
 
     // Normal slideshow mode
     try {
-      const [photosRes, configRes] = await Promise.all([
+      const [photosRes, configRes, pollingRes] = await Promise.all([
         fetch('/api/photos'),
-        fetch('/api/config')
+        fetch('/api/config'),
+        fetch('/api/config/polling')
       ])
       const list = await photosRes.json()
       const cfg  = await configRes.json()
+      const poll = await pollingRes.json()
+      Object.assign(pollingConfig, poll)
       Object.assign(config, cfg)
       document.body.className = 'fit-' + config.fit
       document.documentElement.style.setProperty('--dur', config.interval + 's')
@@ -1018,7 +1027,7 @@
       }
     } catch(e) { console.error('init', e) }
 
-    setInterval(window.reloadPhotos, 5 * 60 * 1000)
+    setInterval(window.reloadPhotos, pollingConfig.photoReloadMinutes * 60 * 1000)
     
     // Start polling for show-now commands (remote control)
     if (!previewFile) {
@@ -1087,7 +1096,7 @@
   }
 
   function startCommandPolling() {
-    setInterval(pollShowNow, 2000)  // Poll every 2 seconds
+    setInterval(pollShowNow, pollingConfig.showNowSeconds * 1000)
   }
 
   init()

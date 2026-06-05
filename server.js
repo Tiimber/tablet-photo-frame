@@ -6,11 +6,34 @@ const path      = require('path')
 const fs        = require('fs')
 const { spawn, spawnSync } = require('child_process')
 
+// ── Server Configuration ─────────────────────────────────────────────────────
+
+const SERVER_CONFIG_FILE = path.join(__dirname, 'server.config.json')
+const DEFAULT_SERVER_CONFIG = {
+  port: 3000,
+  upload: { maxSizeMB: 1024, imageMagickMemoryMB: 200, imageMagickMapMB: 400 },
+  polling: { photoReloadMinutes: 5, showNowSeconds: 2, queueInitialMs: 1200, queueActiveMs: 2000, queueErrorMs: 3000 },
+  http: { timeoutSeconds: 10 },
+  paths: { photos: './photos', videos: './videos', pending: './pending', thumbs: './thumbs', public: './public' }
+}
+
+function loadServerConfig() {
+  try {
+    const loaded = JSON.parse(fs.readFileSync(SERVER_CONFIG_FILE, 'utf8'))
+    return { ...DEFAULT_SERVER_CONFIG, ...loaded }
+  } catch { return { ...DEFAULT_SERVER_CONFIG } }
+}
+
+const serverConfig = loadServerConfig()
+
+// Environment variable overrides
+if (process.env.PORT) serverConfig.port = parseInt(process.env.PORT, 10)
+
 const app         = express()
-const PHOTOS_DIR  = path.join(__dirname, 'photos')
-const PUBLIC_DIR  = path.join(__dirname, 'public')
-const PENDING_DIR = path.join(__dirname, 'pending')
-const THUMBS_DIR  = path.join(__dirname, 'thumbs')
+const PHOTOS_DIR  = path.join(__dirname, serverConfig.paths.photos)
+const PUBLIC_DIR  = path.join(__dirname, serverConfig.paths.public)
+const PENDING_DIR = path.join(__dirname, serverConfig.paths.pending)
+const THUMBS_DIR  = path.join(__dirname, serverConfig.paths.thumbs)
 const CONFIG_FILE = path.join(__dirname, 'config.json')
 const META_FILE   = path.join(__dirname, 'meta.json')
 
@@ -110,7 +133,8 @@ function processQueue() {
   if (!isVideo) {
     // Images → ImageMagick with memory limits to avoid OOM on large HEICs
     const proc = spawn('convert', [
-      '-limit', 'memory', '200MiB', '-limit', 'map', '400MiB',
+      '-limit', 'memory', `${serverConfig.upload.imageMagickMemoryMB}MiB`,
+      '-limit', 'map', `${serverConfig.upload.imageMagickMapMB}MiB`,
       next.origPath + '[0]', '-auto-orient', '-resize', '1920x1080>',
       '-strip', '-quality', '85', outPath
     ])
@@ -208,7 +232,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 1024 * 1024 * 1024 },
+  limits: { fileSize: serverConfig.upload.maxSizeMB * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase()
     cb(null, MEDIA_EXTS.has(ext))
@@ -238,7 +262,7 @@ app.get('/api/photos', (req, res) => {
       const paths = files.map(f => path.join(PHOTOS_DIR, f.name))
       const et = spawnSync('exiftool', ['-json', '-q',
         '-DateTimeOriginal', '-CreateDate', '-FileModifyDate', ...paths],
-        { timeout: 10000 })
+        { timeout: serverConfig.http.timeoutSeconds * 1000 })
       if (et.status === 0) {
         const exifList = JSON.parse(et.stdout.toString())
         const dateMap = {}
@@ -331,6 +355,11 @@ app.post('/api/config', async (req, res) => {
   res.json(cfg)
   // Sync changed fields back to HA (only if something actually changed, preventing loops)
   syncToHA(cfg, old).catch(() => {})
+})
+
+// Expose polling intervals to frontend
+app.get('/api/config/polling', (req, res) => {
+  res.json(serverConfig.polling)
 })
 
 // ── HA sync credentials ───────────────────────────────────────────────────────
@@ -475,4 +504,4 @@ app.post('/api/trim/:filename', (req, res) => {
   })
 })
 
-app.listen(3000, () => console.log('Slideshow server on :3000'))
+app.listen(serverConfig.port, () => console.log(`Slideshow server on :${serverConfig.port}`))

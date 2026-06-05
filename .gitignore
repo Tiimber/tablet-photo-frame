@@ -19,6 +19,7 @@ pids/
 .env.local
 ha_sync.json
 config.json
+server.config.json
 
 # Metadata
 meta.json

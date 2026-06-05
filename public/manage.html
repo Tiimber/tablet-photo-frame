@@ -1137,6 +1137,13 @@
   const selectedSet = new Set()
   let allFiles  = []
   let metaData  = {}
+  
+  // Polling intervals (loaded from server config)
+  let pollingConfig = {
+    queueInitialMs: 1200,
+    queueActiveMs: 2000,
+    queueErrorMs: 3000
+  }
 
   function updateSelectionUI() {
     const n = selectedSet.size
@@ -1634,7 +1641,7 @@
 
   function startQueuePolling() {
     clearTimeout(pollTimer)
-    pollTimer = setTimeout(pollQueue, 1200)
+    pollTimer = setTimeout(pollQueue, pollingConfig.queueInitialMs)
   }
 
   async function pollQueue() {
@@ -1675,8 +1682,8 @@
       renderQueue()
 
       const hasWork = [...localQueue.values()].some(i => i.status === 'pending' || i.status === 'processing')
-      if (hasWork || localQueue.size > 0) pollTimer = setTimeout(pollQueue, 2000)
-    } catch { if (localQueue.size > 0) pollTimer = setTimeout(pollQueue, 3000) }
+      if (hasWork || localQueue.size > 0) pollTimer = setTimeout(pollQueue, pollingConfig.queueActiveMs)
+    } catch { if (localQueue.size > 0) pollTimer = setTimeout(pollQueue, pollingConfig.queueErrorMs) }
   }
 
   function renderQueue() {
@@ -1783,8 +1790,20 @@
     }
   }
 
-  loadMedia()
-  startQueuePolling()
+  // Initialize: load polling config and media
+  async function init() {
+    try {
+      const pollingRes = await fetch('/api/config/polling')
+      const poll = await pollingRes.json()
+      Object.assign(pollingConfig, poll)
+    } catch (e) {
+      console.error('Failed to load polling config:', e)
+    }
+    await loadMedia()
+    startQueuePolling()
+  }
+
+  init()
 
   // ── Settings panel ────────────────────────────────────────────────────────
   const btnSettings  = document.getElementById('btn-settings')
