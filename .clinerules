@@ -1,0 +1,170 @@
+# Tablet Photo Frame — Project Rules
+# These rules give a fresh AI session all the context needed to work on this project.
+
+## Project Overview
+Node.js/Express 5 + WebSocket slideshow server for a tablet photo frame.
+- `server.js` — backend (Express 5, `ws` WebSocket, multer uploads, ffmpeg/ImageMagick processing)
+- `public/slideshow.html` — full-screen slideshow frontend (~1650 lines)
+- `public/manage.html` — media library management UI (~1900 lines)
+- `package.json` — uses `yarn` (not npm); run `yarn install` after adding deps
+
+## Infrastructure
+
+### Production Server
+- **Host:** `192.168.68.50`
+- **User:** `root` (key-based auth, no password needed)
+- **App directory:** `/opt/slideshow`
+- **Process manager:** PM2, app name `slideshow`
+- **Deploy command:** `ssh root@192.168.68.50 'cd /opt/slideshow && git pull origin main && pm2 restart slideshow'`
+- **Note:** Server branch has no upstream tracking; always use `git pull origin main`
+
+### Git Remote
+- **GitHub:** `https://github.com/Tiimber/tablet-photo-frame.git`
+- **Branch:** `main`
+- **Push then deploy:** `git push && ssh root@192.168.68.50 'cd /opt/slideshow && git pull origin main && pm2 restart slideshow'`
+
+### Local Media Source (for bulk operations)
+- **Local photos/videos:** `/Users/robbintapper/Desktop/frame/`
+- Used when generating posters or processing existing media locally before uploading
+
+## Home Assistant Integration
+
+### HA Server
+- **URL:** `http://192.168.68.140:8123`
+- **Config file on server:** `/opt/slideshow/ha_sync.json` (gitignored, contains long-lived token)
+- **HA config file:** `/config/configuration.yaml` on the HA host
+
+### HA Entity IDs (synced from slideshow config)
+| Config key     | HA Entity ID                              | Type           |
+|----------------|-------------------------------------------|----------------|
+| `interval`     | `input_number.slideshow_interval`         | input_number   |
+| `transition`   | `input_select.slideshow_transition`       | input_select   |
+| `kenBurns`     | `input_boolean.slideshow_ken_burns`       | input_boolean  |
+| `kenBurnsSpeed`| `input_select.slideshow_ken_burns_speed`  | input_select   |
+| `order`        | `input_select.slideshow_order`            | input_select   |
+| `fit`          | `input_select.slideshow_fit`              | input_select   |
+
+### Reloading HA entities after configuration.yaml changes
+```
+ssh root@192.168.68.140 'curl -s -X POST http://localhost:8123/api/services/input_select/reload \
+  -H "Authorization: Bearer $(jq -r .token /opt/slideshow/ha_sync.json)" \
+  -H "Content-Type: application/json"'
+```
+(Also reload `input_number` and `input_boolean` if those change.)
+
+## Server-Side File Layout (on production server)
+```
+/opt/slideshow/
+  server.js
+  public/
+    slideshow.html
+    manage.html
+  photos/          # processed images (gitignored)
+  videos/          # processed videos (gitignored)
+  thumbs/          # image thumbnails (gitignored)
+  posters/         # video first-frame JPEGs (gitignored)
+  pending/         # upload queue (gitignored)
+  config.json      # runtime config (gitignored)
+  meta.json        # display names + dates (gitignored)
+  ha_sync.json     # HA URL + token (gitignored)
+  server.config.json  # server tuning (gitignored)
+```
+
+## Gitignored Files (exist on server, not in repo)
+- `config.json` — slideshow settings (interval, transition, kenBurns, order, fit, kenBurnsSpeed)
+- `meta.json` — per-file metadata (displayName, date)
+- `ha_sync.json` — `{ "url": "http://192.168.68.140:8123", "token": "..." }`
+- `server.config.json` — port, paths, processing limits
+- `photos/`, `videos/`, `thumbs/`, `posters/`, `pending/`
+
+## Key Architecture Notes
+
+### WebSocket
+- Server broadcasts JSON messages to all connected clients via `broadcast(msg)`
+- Client reconnects automatically with exponential backoff
+- Message types: `config`, `photos`, `queue`, `show_now`
+
+### Media Processing Pipeline
+- Upload → `pending/` → `processQueue()` → `photos/` or `videos/`
+- Images: ImageMagick `convert` → resize to 1920px max, strip EXIF, JPEG
+- Videos: ffmpeg → H.264/AAC MP4
+- Posters: `generatePoster()` → ffmpeg `-frames:v 1 -q:v 2` → `posters/NAME.jpg`
+- Thumbnails: ImageMagick → `thumbs/NAME.jpg` (300px)
+- Dates extracted via ExifTool during image processing
+
+### Static Routes
+- `/photos/` → `./photos`
+- `/videos/` → `./videos`
+- `/thumbs/` → `./thumbs`
+- `/posters/` → `./posters`
+
+### Key API Endpoints
+- `GET /api/photos` — list all media with name, date, type
+- `GET /api/config` — current slideshow config
+- `POST /api/config` — update config (also syncs to HA)
+- `GET /api/photos/:filename/info` — size, date, displayName
+- `GET /api/photos/:filename/poster` — video poster JPEG
+- `DELETE /api/photos/:filename` — delete media + thumb + poster
+- `GET /api/version` — `{ commit: "..." }` git hash
+
+## Slideshow Frontend Key Variables & Functions
+
+### State
+- `isPaused` — boolean, true when slideshow is paused
+- `timer` — setInterval handle for slide advancement
+- `config` — current settings object
+- `photos` — array of filenames in display order
+- `queuePos` — current index in photos array
+- `slotA`, `slotB` — the two `.slide` div elements (double-buffer)
+- `currentGroup`, `currentIsDual`, `currentIsStack` — currently displayed slide info
+- `dateCache` — `filename → 'YYYY-MM-DD'` map
+
+### Key Functions
+- `startTimer()` — starts/restarts the interval timer
+- `resumeSlideshow()` — clears isPaused, removes .paused class, calls startTimer()
+- `window.nextSlide()` — advance to next slide with transition
+- `window.prevSlide()` — go to previous slide with transition
+- `openSettings()` — pauses slideshow, builds info panels, starts 30s auto-close
+- `closeSettings()` — closes overlay, resumes slideshow
+- `buildInfoPanels()` — creates per-media info panels around settings panel
+- `openManageModal(fn)` — opens manage modal for a specific file
+- `connectWebSocket()` — connects WS with auto-reconnect
+
+### Gesture System (public/slideshow.html ~line 1380)
+- **Swipe left** (>50px horiz, more horiz than vert) → `nextSlide()`
+- **Swipe right** → `prevSlide()`
+- **Short tap** (<500ms, <10px movement) → `tapPause()` — toggle pause, 30s auto-resume
+- **Long press** (≥500ms, <8px movement) → `openSettings()`
+- Variables: `gestureStart`, `longPressTimer`, `tapPauseAutoResume`
+
+### Settings Overlay Auto-Close
+- `settingsAutoCloseTimer` — 30s timer, resets on any interaction inside overlay
+- `resetSettingsAutoClose()` — resets countdown bar animation + timer
+- CSS `#settings-countdown` — blue bar at bottom, shrinks over 30s via CSS animation
+
+### Video Poster Overlay
+- `.video-poster` — `position:absolute; inset:0; z-index:1` img overlay on video slides
+- Fades out (`opacity:0`) when video fires `playing` event
+- Used in: slide display, info panels, manage modal preview
+
+## Available Transitions (TRANSITION_LIST in slideshow.html)
+`crossfade`, `fade_black`, `slide_left`, `slide_right`, `slide_up`, `slide_down`,
+`zoom_in`, `zoom_out`, `circle_iris`, `diagonal_wipe`, `clock_wipe`, `pixelate`,
+`glitch`, `shatter`
+
+(Removed: `barn_doors`, `paint_brush`, `ripple`, `mosaic`, `blinds`)
+
+## Development Workflow
+1. Edit files locally in `/Users/robbintapper/tablet-photo-frame`
+2. `git add -A && git commit -m "..."` 
+3. `git push && ssh root@192.168.68.50 'cd /opt/slideshow && git pull origin main && pm2 restart slideshow'`
+4. No build step — plain HTML/JS/CSS served statically
+5. No `npm install` needed unless `package.json` dependencies change
+
+## Common Pitfalls
+- **apply_diff line numbers drift** after large insertions — use `search_files` to find exact current line numbers before diffing
+- **git pull on server** needs explicit branch: `git pull origin main` (no upstream tracking set)
+- **Gitignored config files** on server must be edited via SSH, not via git
+- **ffmpeg/ImageMagick** must be installed on server for media processing
+- **posters/** directory is created automatically by server on startup (`fs.mkdirSync`)
+- When adding new HA entities: update `configuration.yaml` on HA host AND reload the entity type via REST API
