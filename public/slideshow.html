@@ -2137,7 +2137,7 @@
         else { closeSettings(); if (!isPaused) resumeSlideshow() }
       } else if (msg.type === 'remote-dashboard') {
         if (dashboardOpen) closeDashboard()
-        else openDashboard()
+        else { if (overlay.classList.contains('open')) closeSettings(); openDashboard() }
       }
     })
 
