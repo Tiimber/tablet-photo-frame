@@ -752,6 +752,86 @@ I did<!DOCTYPE html>
     font-weight: 600;
   }
   #delete-confirm-box .dc-delete:hover { background: #962626; }
+
+  /* ── Control Center ─────────────────────────────────────────────────────── */
+  #cc-screen { display: flex; flex-direction: column; gap: 12px; }
+
+  /* Lights off shortcut */
+  .cc-lights-off-btn {
+    width: 100%; padding: 14px 16px;
+    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
+    color: #c8922a; font-size: 1rem; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    transition: background 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cc-lights-off-btn:active { background: #252525; border-color: #7a5a20; }
+  .cc-lights-off-btn.cc-done { color: #4caf50; border-color: #2a4a2a; }
+
+  /* Elec graph mini card */
+  .cc-elec-mini { flex-shrink: 0; }
+  .cc-elec-mini-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .cc-elec-mini-price { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+  .cc-elec-mini-unit { font-size: 0.72rem; color: #555; }
+
+  /* AC card */
+  .cc-ac-card { flex-shrink: 0; }
+  .cc-ac-body { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .cc-ac-temp {
+    font-size: 2.4rem; font-weight: 200; color: #fff; line-height: 1;
+    min-width: 80px; text-align: center; transition: color 0.3s;
+  }
+  .cc-ac-temp.cc-pending { color: #555; }
+  .cc-ac-mode { font-size: 0.78rem; color: #666; text-align: center; margin-top: 2px; }
+  .cc-ac-btns { display: flex; flex-direction: column; gap: 6px; }
+  .cc-ac-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: #252525; border: 1px solid #3a3a3a; color: #ccc;
+    font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s; -webkit-tap-highlight-color: transparent;
+  }
+  .cc-ac-btn:active { background: #3a3a3a; }
+
+  /* Charging card */
+  .cc-charge-card { flex-shrink: 0; }
+  .cc-charge-body { display: flex; gap: 10px; margin-top: 8px; align-items: flex-start; }
+  .cc-charge-img-wrap {
+    flex: 0 0 auto; width: 120px;
+    background: #111; border-radius: 8px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cc-charge-img { width: 100%; display: block; object-fit: contain; }
+  .cc-charge-img-placeholder { color: #333; font-size: 2rem; padding: 20px; }
+  .cc-charge-controls { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .cc-charge-field { display: flex; flex-direction: column; gap: 3px; }
+  .cc-charge-label { font-size: 0.68rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+  .cc-charge-value { font-size: 1.1rem; font-weight: 600; color: #ddd; }
+  .cc-charge-input-row { display: flex; align-items: center; gap: 6px; }
+  .cc-charge-adj-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #252525; border: 1px solid #3a3a3a; color: #ccc;
+    font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s; -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+  }
+  .cc-charge-adj-btn:active { background: #3a3a3a; }
+  .cc-charge-soc-val { font-size: 1.1rem; font-weight: 600; color: #ddd; min-width: 44px; text-align: center; }
+  .cc-charge-soc-val.cc-pending { color: #555; }
+  .cc-charge-updating { font-size: 0.7rem; color: #555; font-style: italic; }
+
+  /* Camera feeds */
+  .cc-cameras { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .cc-camera-card {
+    background: #111; border: 1px solid #2a2a2a; border-radius: 10px;
+    overflow: hidden; position: relative;
+  }
+  .cc-camera-label {
+    position: absolute; top: 6px; left: 8px;
+    font-size: 0.65rem; color: rgba(255,255,255,0.6);
+    background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px;
+    pointer-events: none; z-index: 1;
+  }
+  .cc-camera-img { width: 100%; display: block; object-fit: cover; min-height: 80px; background: #111; }
+  .cc-camera-unavail { color: #333; font-size: 0.75rem; padding: 20px; text-align: center; }
 </style>
 </head>
 <body class="fit-cover">
@@ -820,7 +900,77 @@ I did<!DOCTYPE html>
       <!-- ── Screen 1: Control Center ──────────────────────────────── -->
       <div class="db-screen" id="db-screen-1">
         <div class="db-screen-title">Control Center</div>
-        <div class="db-placeholder">🎛️<br>Coming soon</div>
+        <div id="cc-screen">
+
+          <!-- Lights off shortcut -->
+          <button class="cc-lights-off-btn" id="cc-lights-off-btn" onclick="ccTurnOffAllLights()">
+            <span>💡</span><span>Turn off all lights</span>
+          </button>
+
+          <!-- Electricity price graph -->
+          <div class="db-card cc-elec-mini">
+            <div class="cc-elec-mini-header">
+              <div class="db-info-label">⚡ Electricity now</div>
+              <div class="cc-elec-mini-price" id="cc-elec-price">—</div>
+              <div class="cc-elec-mini-unit">kr/kWh</div>
+            </div>
+            <svg class="db-elec-graph" id="cc-elec-graph" preserveAspectRatio="none"></svg>
+          </div>
+
+          <!-- AC control -->
+          <div class="db-card cc-ac-card">
+            <div class="db-info-label">❄️ AC — Boost temperature</div>
+            <div class="cc-ac-body">
+              <div>
+                <div class="cc-ac-temp" id="cc-ac-temp">—</div>
+                <div class="cc-ac-mode" id="cc-ac-mode"></div>
+              </div>
+              <div class="cc-ac-btns">
+                <button class="cc-ac-btn" onclick="ccAcAdjust('increment')">＋</button>
+                <button class="cc-ac-btn" onclick="ccAcAdjust('decrement')">－</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Car charging override -->
+          <div class="db-card cc-charge-card">
+            <div class="db-info-label">🚗 Charging plan override</div>
+            <div class="cc-charge-body">
+              <div class="cc-charge-img-wrap" id="cc-charge-img-wrap">
+                <div class="cc-charge-img-placeholder">📋</div>
+              </div>
+              <div class="cc-charge-controls">
+                <div class="cc-charge-field">
+                  <div class="cc-charge-label">Next departure</div>
+                  <div class="cc-charge-value" id="cc-departure">—</div>
+                </div>
+                <div class="cc-charge-field">
+                  <div class="cc-charge-label">Target SoC</div>
+                  <div class="cc-charge-input-row">
+                    <button class="cc-charge-adj-btn" onclick="ccSocAdjust(-5)">－</button>
+                    <div class="cc-charge-soc-val" id="cc-soc-val">—</div>
+                    <button class="cc-charge-adj-btn" onclick="ccSocAdjust(+5)">＋</button>
+                  </div>
+                  <div class="cc-charge-updating" id="cc-soc-status"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Camera feeds -->
+          <div class="db-section-label">Cameras</div>
+          <div class="cc-cameras">
+            <div class="cc-camera-card">
+              <div class="cc-camera-label">Tapo SD</div>
+              <img class="cc-camera-img" id="cc-cam-tapo" alt="Tapo SD">
+            </div>
+            <div class="cc-camera-card">
+              <div class="cc-camera-label">Galaxy Tab A8</div>
+              <img class="cc-camera-img" id="cc-cam-galaxy" alt="Galaxy Tab A8">
+            </div>
+          </div>
+
+        </div>
       </div>
 
       <!-- ── Screen 2: Lights ──────────────────────────────────────── -->
@@ -2430,14 +2580,255 @@ I did<!DOCTYPE html>
     }).join('')
   }
 
+  // ── Control Center ───────────────────────────────────────────────────────
+  let ccCamTimer = null
+  let ccSocCurrent = null   // last known SoC value
+  let ccSocPending = false  // waiting for plan refresh
+
+  // Shared price-color helper (same as Summary)
+  const ccPriceColor = v => v <= 0.5 ? '#4caf50' : v <= 1.2 ? '#8bc34a' : v <= 2.0 ? '#ffc107' : '#f44336'
+
+  async function ccTurnOffAllLights() {
+    const btn = document.getElementById('cc-lights-off-btn')
+    if (!btn) return
+    btn.disabled = true
+    btn.classList.remove('cc-done')
+    try {
+      await fetch('/api/ha-service', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: 'light', service: 'turn_off', data: { entity_id: 'all' } })
+      })
+      btn.classList.add('cc-done')
+      btn.querySelector('span:last-child').textContent = 'All lights off ✓'
+      setTimeout(() => {
+        btn.classList.remove('cc-done')
+        btn.querySelector('span:last-child').textContent = 'Turn off all lights'
+        btn.disabled = false
+      }, 3000)
+    } catch {
+      btn.disabled = false
+    }
+  }
+  window.ccTurnOffAllLights = ccTurnOffAllLights
+
+  async function ccLoadElec() {
+    try {
+      const r = await fetch('/api/ha-template', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template: "{{ state_attr('sensor.nordpool','today') | tojson }} ||| {{ state_attr('sensor.nordpool','tomorrow') | tojson }}" })
+      })
+      if (!r.ok) throw new Error()
+      const txt = (await r.text()).trim()
+      const [todayStr, tomorrowStr] = txt.split(' ||| ')
+      const todayVals    = JSON.parse(todayStr) || []
+      const tomorrowVals = JSON.parse(tomorrowStr) || []
+      const localMidnight = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime() }
+      const tomorrowMidnight = localMidnight() + 86400000
+      const allSlots = [
+        ...todayVals.map((v, i) => ({ value: v, t: localMidnight() + i * 15 * 60000 })),
+        ...tomorrowVals.map((v, i) => ({ value: v, t: tomorrowMidnight + i * 15 * 60000 }))
+      ]
+      const now = Date.now()
+      const curIdx = allSlots.findIndex((s, i) => { const next = allSlots[i+1]; return s.t <= now && (!next || now < next.t) })
+      const startIdx = curIdx >= 0 ? curIdx : 0
+      const slots = allSlots.slice(startIdx, startIdx + 96)
+      const curVal = slots[0] ? slots[0].value : null
+      const elP = document.getElementById('cc-elec-price')
+      if (elP) { elP.textContent = curVal !== null ? curVal.toFixed(2) : '—'; elP.style.color = curVal !== null ? ccPriceColor(curVal) : '#ddd' }
+      // Draw graph
+      const svg = document.getElementById('cc-elec-graph')
+      if (!svg) return
+      const W = svg.getBoundingClientRect().width || 300, H = 70
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
+      const vals = slots.map(s => s.value)
+      const maxV = Math.ceil(Math.max(...vals))
+      const py = v => H - (v / (maxV || 1)) * (H - 6) - 3
+      const px = i => vals.length > 1 ? (i / (vals.length - 1)) * W : 0
+      svg.innerHTML = ''
+      for (let y = 0; y <= maxV; y++) {
+        const yp = py(y)
+        const gl = document.createElementNS('http://www.w3.org/2000/svg','line')
+        gl.setAttribute('x1','0'); gl.setAttribute('x2',W); gl.setAttribute('y1',yp.toFixed(1)); gl.setAttribute('y2',yp.toFixed(1))
+        gl.setAttribute('stroke','#2a2a2a'); gl.setAttribute('stroke-width','1'); svg.appendChild(gl)
+      }
+      slots.forEach((s, i) => {
+        const d = new Date(s.t); if (d.getMinutes() !== 0) return
+        const isMidnight = d.getHours() === 0; const x = px(i).toFixed(1)
+        const vl = document.createElementNS('http://www.w3.org/2000/svg','line')
+        vl.setAttribute('x1',x); vl.setAttribute('x2',x); vl.setAttribute('y1','0'); vl.setAttribute('y2',H)
+        vl.setAttribute('stroke', isMidnight ? '#555' : '#2e2e2e'); vl.setAttribute('stroke-width', isMidnight ? '2' : '1'); svg.appendChild(vl)
+      })
+      const segPaths = {}
+      vals.forEach((v, i) => {
+        const c = ccPriceColor(v); if (!segPaths[c]) segPaths[c] = ''
+        const x = px(i).toFixed(1), y = py(v).toFixed(1)
+        if (i === 0 || ccPriceColor(vals[i-1]) !== c) segPaths[c] += (i > 0 ? `M${px(i-1).toFixed(1)},${py(vals[i-1]).toFixed(1)}L` : 'M') + `${x},${y}`
+        else segPaths[c] += `L${x},${y}`
+      })
+      Object.entries(segPaths).forEach(([color, d]) => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg','path')
+        path.setAttribute('d', d); path.setAttribute('fill','none'); path.setAttribute('stroke', color)
+        path.setAttribute('stroke-width','2'); path.setAttribute('stroke-linecap','round'); path.setAttribute('stroke-linejoin','round')
+        svg.appendChild(path)
+      })
+      // Current position marker
+      if (curIdx >= 0) {
+        const mx = px(0).toFixed(1)
+        const ml = document.createElementNS('http://www.w3.org/2000/svg','line')
+        ml.setAttribute('x1',mx); ml.setAttribute('x2',mx); ml.setAttribute('y1','0'); ml.setAttribute('y2',H)
+        ml.setAttribute('stroke','rgba(255,255,255,0.4)'); ml.setAttribute('stroke-width','1.5'); svg.appendChild(ml)
+      }
+    } catch {}
+  }
+
+  async function ccLoadAC() {
+    try {
+      const r = await fetch('/api/ha-state/climate.qlima_webber_wms')
+      const d = await r.json()
+      const tempEl = document.getElementById('cc-ac-temp')
+      const modeEl = document.getElementById('cc-ac-mode')
+      if (!tempEl) return
+      if (!d || d.error) { tempEl.textContent = '—'; return }
+      const target = d.attributes?.temperature != null ? d.attributes.temperature + '°C' : '—'
+      const mode = d.state === 'off' ? 'Off' : (d.state.charAt(0).toUpperCase() + d.state.slice(1).replace(/_/g,' '))
+      tempEl.textContent = target
+      tempEl.classList.remove('cc-pending')
+      if (modeEl) modeEl.textContent = mode
+    } catch {}
+  }
+
+  async function ccAcAdjust(dir) {
+    const tempEl = document.getElementById('cc-ac-temp')
+    if (tempEl) tempEl.classList.add('cc-pending')
+    try {
+      await fetch('/api/ha-service', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: 'script', service: dir === 'increment' ? 'increment_boost_temperature' : 'decrement_boost_temperature', data: {} })
+      })
+      // Poll until value changes (max 8s)
+      const prev = tempEl ? tempEl.textContent : null
+      let attempts = 0
+      const poll = setInterval(async () => {
+        attempts++
+        try {
+          const r = await fetch('/api/ha-state/climate.qlima_webber_wms')
+          const d = await r.json()
+          const newTarget = d.attributes?.temperature != null ? d.attributes.temperature + '°C' : null
+          if (newTarget && newTarget !== prev) {
+            clearInterval(poll)
+            if (tempEl) { tempEl.textContent = newTarget; tempEl.classList.remove('cc-pending') }
+            const modeEl = document.getElementById('cc-ac-mode')
+            if (modeEl) modeEl.textContent = d.state === 'off' ? 'Off' : (d.state.charAt(0).toUpperCase() + d.state.slice(1).replace(/_/g,' '))
+          }
+        } catch {}
+        if (attempts >= 8) { clearInterval(poll); if (tempEl) tempEl.classList.remove('cc-pending') }
+      }, 1000)
+    } catch { if (tempEl) tempEl.classList.remove('cc-pending') }
+  }
+  window.ccAcAdjust = ccAcAdjust
+
+  async function ccLoadCharging() {
+    // Departure time
+    try {
+      const r = await fetch('/api/ha-state/time.next_session_departure')
+      const d = await r.json()
+      const el = document.getElementById('cc-departure')
+      if (el) el.textContent = (d && d.state && d.state !== 'unavailable') ? d.state : '—'
+    } catch {}
+    // Target SoC
+    try {
+      const r = await fetch('/api/ha-state/number.next_session_target_soc')
+      const d = await r.json()
+      const el = document.getElementById('cc-soc-val')
+      if (el && d && d.state && d.state !== 'unavailable') {
+        ccSocCurrent = parseFloat(d.state)
+        if (!ccSocPending) { el.textContent = Math.round(ccSocCurrent) + '%'; el.classList.remove('cc-pending') }
+      }
+    } catch {}
+    // Charging plan image
+    ccRefreshChargingImage()
+  }
+
+  function ccRefreshChargingImage() {
+    const wrap = document.getElementById('cc-charge-img-wrap')
+    if (!wrap) return
+    const ts = Date.now()
+    const img = document.createElement('img')
+    img.className = 'cc-charge-img'
+    img.alt = 'Charging plan'
+    img.onerror = () => { wrap.innerHTML = '<div class="cc-charge-img-placeholder">📋</div>' }
+    img.onload = () => { wrap.innerHTML = ''; wrap.appendChild(img) }
+    img.src = '/api/ha-camera/camera.charging_plan_report?t=' + ts
+  }
+
+  async function ccSocAdjust(delta) {
+    const el = document.getElementById('cc-soc-val')
+    const statusEl = document.getElementById('cc-soc-status')
+    if (ccSocCurrent === null) return
+    const newVal = Math.max(0, Math.min(100, Math.round(ccSocCurrent + delta)))
+    ccSocCurrent = newVal
+    ccSocPending = true
+    if (el) { el.textContent = newVal + '%'; el.classList.add('cc-pending') }
+    if (statusEl) statusEl.textContent = 'Updating plan…'
+    try {
+      await fetch('/api/ha-service', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: 'number', service: 'set_value', data: { entity_id: 'number.next_session_target_soc', value: newVal } })
+      })
+      // Wait for charging plan image to update (poll camera entity state change via image reload)
+      let attempts = 0
+      const poll = setInterval(async () => {
+        attempts++
+        // Reload the plan image each attempt
+        ccRefreshChargingImage()
+        // Also re-fetch SoC to confirm it applied
+        try {
+          const r = await fetch('/api/ha-state/number.next_session_target_soc')
+          const d = await r.json()
+          const confirmed = d && d.state && parseFloat(d.state) === newVal
+          if (confirmed || attempts >= 10) {
+            clearInterval(poll)
+            ccSocPending = false
+            if (el) { el.textContent = Math.round(newVal) + '%'; el.classList.remove('cc-pending') }
+            if (statusEl) statusEl.textContent = confirmed ? '' : 'Done'
+            setTimeout(() => { if (statusEl) statusEl.textContent = '' }, 2000)
+          }
+        } catch { if (attempts >= 10) { clearInterval(poll); ccSocPending = false; if (el) el.classList.remove('cc-pending'); if (statusEl) statusEl.textContent = '' } }
+      }, 2000)
+    } catch {
+      ccSocPending = false
+      if (el) el.classList.remove('cc-pending')
+      if (statusEl) statusEl.textContent = ''
+    }
+  }
+  window.ccSocAdjust = ccSocAdjust
+
+  function ccRefreshCameras() {
+    const ts = Date.now()
+    const tapo = document.getElementById('cc-cam-tapo')
+    const galaxy = document.getElementById('cc-cam-galaxy')
+    if (tapo) tapo.src = '/api/ha-camera/camera.tapo_sd_stream?t=' + ts
+    if (galaxy) galaxy.src = '/api/ha-camera/camera.galaxy_tab_a8?t=' + ts
+  }
+
+  async function dbLoadControlCenter() {
+    await Promise.all([ccLoadElec(), ccLoadAC(), ccLoadCharging()])
+    ccRefreshCameras()
+    if (ccCamTimer) clearInterval(ccCamTimer)
+    ccCamTimer = setInterval(ccRefreshCameras, 10000)
+  }
+
   // Patch dbSetScreen to load lights when navigating to screen 2
   ;(function() {
     const orig = dbSetScreen
     dbSetScreen = function(n, animate) {
       orig(n, animate)
       const s = ((n % DB_SCREENS) + DB_SCREENS) % DB_SCREENS
+      if (s === 1) dbLoadControlCenter()
       if (s === 2) lxInit().then(() => lxRenderRooms())
       if (s === 3) dbLoadSensors()
+      // Stop camera refresh when leaving screen 1
+      if (s !== 1 && ccCamTimer) { clearInterval(ccCamTimer); ccCamTimer = null }
     }
     window.dbNextScreen = () => dbSetScreen(dbScreen + 1)
     window.dbPrevScreen = () => dbSetScreen(dbScreen - 1)

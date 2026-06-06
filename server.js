@@ -530,6 +530,23 @@ app.post('/api/dashboard/shortcut', express.json(), (req, res) => {
   res.json({ ok: true, action })
 })
 
+// ── HA camera proxy ───────────────────────────────────────────────────────────
+app.get('/api/ha-camera/:entity', async (req, res) => {
+  const ha = loadHASync()
+  if (!ha || !ha.url || !ha.token) return res.status(503).json({ error: 'HA not configured' })
+  const entity = req.params.entity
+  try {
+    const r = await fetch(`${ha.url.replace(/\/$/,'')}/api/camera_proxy/${entity}`, {
+      headers: { 'Authorization': 'Bearer ' + ha.token }
+    })
+    if (!r.ok) return res.status(r.status).send('unavailable')
+    const buf = Buffer.from(await r.arrayBuffer())
+    res.set('Content-Type', r.headers.get('content-type') || 'image/jpeg')
+    res.set('Cache-Control', 'no-store')
+    res.send(buf)
+  } catch(e) { res.status(502).send('error') }
+})
+
 // ── Lights config ─────────────────────────────────────────────────────────────
 const LIGHTS_FILE = path.join(__dirname, 'lights.json')
 app.get('/api/lights/config', (req, res) => {
