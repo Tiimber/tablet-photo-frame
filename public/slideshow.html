@@ -1724,14 +1724,15 @@
     } catch { document.getElementById('db-car-charge').textContent = '—' }
   }
 
+  let dbWasPlaying = false  // was slideshow running when dashboard opened?
+
   function openDashboard() {
     if (dashboardOpen) return
     dashboardOpen = true
-    if (!isPaused) {
-      if (timer) { clearInterval(timer); timer = null }
-      document.querySelectorAll('.slide video').forEach(v => v.pause())
-      document.querySelectorAll('.slide .media-item img').forEach(img => { img.style.animationPlayState = 'paused' })
-    }
+    dbWasPlaying = !isPaused
+    if (timer) { clearInterval(timer); timer = null }
+    document.querySelectorAll('.slide video').forEach(v => v.pause())
+    document.querySelectorAll('.slide .media-item img').forEach(img => { img.style.animationPlayState = 'paused' })
     dbSetScreen(0, false)
     dashboardEl.classList.remove('closing')
     dashboardEl.classList.add('open')
@@ -1747,7 +1748,11 @@
     dashboardEl.addEventListener('animationend', () => {
       dashboardEl.classList.remove('open','closing')
     }, { once: true })
-    if (!isPaused) resumeSlideshow()
+    if (dbWasPlaying) {
+      document.querySelectorAll('.slide video').forEach(v => v.play().catch(() => {}))
+      document.querySelectorAll('.slide .media-item img').forEach(img => { img.style.animationPlayState = 'running' })
+      resumeSlideshow()
+    }
   }
 
   function dbShortcut(action) {

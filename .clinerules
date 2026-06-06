@@ -22,6 +22,13 @@
 - order -> input_select.slideshow_order
 - fit -> input_select.slideshow_fit
 
+## Home Assistant Sync
+- HA Host: root@192.168.68.140 (Key auth)
+- HA Config: /homeassistant/configuration.yaml
+- Sync Rule: Adding `/api/remote/*` to `server.js` requires appending a matching `rest_command` to HA Config.
+- Reload Command:
+  `ssh root@192.168.68.50 'TOKEN=$(python3 -c "import json; print(json.load(open(\"/opt/slideshow/ha_sync.json\"))[\"token\"])") && curl -s -X POST http://192.168.68.140:8123/api/services/homeassistant/reload_all -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"'`
+
 ## Code Editing Rules
 - Target Files: slideshow.html and manage.html are over 1,500 lines. The apply_diff tool will fail on massive rewrites.
 - Strict Rule: Never request huge block rewrites. Search for specific local text strings first, then output edits in tiny, targeted diff blocks.
