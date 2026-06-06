@@ -258,8 +258,11 @@
   /* Weather — SMHI layout */
   .db-weather-loading { color: #444; font-size: 0.85rem; padding: 12px; }
 
-  /* Today + Tomorrow: side-by-side large cards */
-  .db-wx-hero { display: flex; gap: 8px; flex-shrink: 0; }
+  /* Today + Tomorrow: stacked portrait, side-by-side landscape */
+  .db-wx-hero { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  @media (orientation: landscape) {
+    .db-wx-hero { flex-direction: row; }
+  }
   .db-wx-hero-card {
     flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px;
     padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
@@ -281,12 +284,19 @@
   }
   .db-weather-row::-webkit-scrollbar { display: none; }
   .db-weather-day {
-    flex: 0 0 auto; background: #1a1a1a; border: 1px solid #2a2a2a;
+    flex: 1 1 0; background: #1a1a1a; border: 1px solid #2a2a2a;
     border-radius: 10px; padding: 8px 10px;
     display: flex; flex-direction: column; align-items: center; gap: 3px;
-    min-width: 58px;
+    min-width: 52px;
   }
-  .db-weather-dow  { font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 0.04em; }
+  .db-weather-dow  { font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .db-dow-long  { display: none; }
+  .db-dow-short { display: block; }
+  @media (orientation: landscape) {
+    .db-weather-day { flex: 1 1 0; }
+    .db-dow-short { display: none; }
+    .db-dow-long  { display: block; font-size: 0.7rem; }
+  }
   .db-weather-icon { font-size: 1.4rem; line-height: 1; }
   .db-weather-hi   { font-size: 0.88rem; font-weight: 600; color: #ccc; }
   .db-weather-precip { font-size: 0.65rem; color: #4a7a4a; }
@@ -1744,9 +1754,9 @@
       const todayAttrs    = results[0]?.attributes || {}
       const tomorrowAttrs = results[1]?.attributes || {}
       const now = new Date()
-      const todayLabel    = 'Today — ' + now.toLocaleDateString('sv-SE', { weekday:'long' })
+      const todayLabel    = 'Today — ' + now.toLocaleDateString('en-GB', { weekday:'long' })
       const tomorrowDate  = new Date(now); tomorrowDate.setDate(now.getDate()+1)
-      const tomorrowLabel = 'Tomorrow — ' + tomorrowDate.toLocaleDateString('sv-SE', { weekday:'long' })
+      const tomorrowLabel = 'Tomorrow — ' + tomorrowDate.toLocaleDateString('en-GB', { weekday:'long' })
       hero.innerHTML = smhiHeroCard(todayAttrs, todayLabel, 'today') +
                        smhiHeroCard(tomorrowAttrs, tomorrowLabel, 'tomorrow')
 
@@ -1755,11 +1765,13 @@
       for (let i = 2; i < 10; i++) {
         const attrs = results[i]?.attributes || {}
         const d = new Date(now); d.setDate(now.getDate() + i)
-        const dow = d.toLocaleDateString('sv-SE', { weekday:'short' })
+        const dowShort = d.toLocaleDateString('en-GB', { weekday:'short' })
+        const dowLong  = d.toLocaleDateString('en-GB', { weekday:'long' })
         const temp = attrs.air_temperature != null ? Math.round(attrs.air_temperature) + '°' : '—'
         const pop  = attrs.probability_of_precipitation != null ? attrs.probability_of_precipitation + '%' : ''
         weekDays.push(`<div class="db-weather-day">
-          <div class="db-weather-dow">${dow}</div>
+          <div class="db-weather-dow db-dow-short">${dowShort}</div>
+          <div class="db-weather-dow db-dow-long">${dowLong}</div>
           <div class="db-weather-icon">${smhiIcon(attrs.symbol_code)}</div>
           <div class="db-weather-hi">${temp}</div>
           ${pop && parseInt(pop) > 10 ? `<div class="db-weather-precip">${pop}</div>` : ''}
