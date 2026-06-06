@@ -967,9 +967,9 @@ I did<!DOCTYPE html>
                   <div class="cc-charge-field">
                     <div class="cc-charge-label">Target SoC</div>
                     <div class="cc-charge-input-row">
-                      <button class="cc-charge-adj-btn" onclick="ccSocAdjust(-5)">－</button>
+                      <button class="cc-charge-adj-btn" onclick="ccSocAdjust(-10)">－</button>
                       <div class="cc-charge-soc-val" id="cc-soc-val">—</div>
-                      <button class="cc-charge-adj-btn" onclick="ccSocAdjust(+5)">＋</button>
+                      <button class="cc-charge-adj-btn" onclick="ccSocAdjust(+10)">＋</button>
                     </div>
                     <div class="cc-charge-updating" id="cc-soc-status"></div>
                   </div>
@@ -2830,7 +2830,8 @@ I did<!DOCTYPE html>
     const el = document.getElementById('cc-soc-val')
     const statusEl = document.getElementById('cc-soc-status')
     if (ccSocCurrent === null) return
-    const newVal = Math.max(0, Math.min(100, Math.round(ccSocCurrent + delta)))
+    const snapped = Math.round(ccSocCurrent / 10) * 10
+    const newVal = Math.max(0, Math.min(100, snapped + delta))
     ccSocCurrent = newVal
     ccSocPending = true
     if (el) { el.textContent = newVal + '%'; el.classList.add('cc-pending') }
