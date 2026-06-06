@@ -356,7 +356,9 @@ I did<!DOCTYPE html>
 
   /* ── Lights UI ──────────────────────────────────────────────────────────── */
   #lx-rooms-view { display: flex; flex-direction: column; gap: 10px; }
+  #lx-room-list { display: flex; flex-direction: row; flex-wrap: wrap; gap: 10px; }
   .lx-room-card {
+    flex: 0 0 calc(33.333% - 7px);
     background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
     padding: 14px 16px; display: flex; align-items: center; gap: 12px;
     cursor: pointer; transition: background 0.15s, border-color 0.2s;
