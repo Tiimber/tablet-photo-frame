@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+I did<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -339,7 +339,8 @@
   }
   .lx-room-card:active { background: #252525; }
   .lx-room-card.lx-any-on { border-color: #7a5a20; }
-  .lx-room-icon { font-size: 1.5rem; line-height: 1; flex-shrink: 0; }
+  .lx-room-icon { width: 28px; height: 28px; flex-shrink: 0; }
+  .lx-room-icon svg { width: 28px; height: 28px; display: block; }
   .lx-room-name { font-size: 1rem; font-weight: 500; color: #ddd; flex: 1; }
   .lx-room-status { font-size: 0.75rem; color: #555; white-space: nowrap; }
   .lx-room-status.lx-some-on { color: #c8922a; }
@@ -2135,9 +2136,13 @@
       const anyOn = onCnt > 0
       const status = total === 0 ? 'No lights' : onCnt === 0 ? 'All off' :
                      onCnt === total ? 'All on' : `${onCnt} of ${total} on`
-      const icon = anyOn ? '💡' : '○'
+      const bulbColor = anyOn ? '#c8922a' : '#3a3a3a'
+      const bulbPath = anyOn
+        ? 'M12,2A7,7 0 0,1 19,9C19,11.38 17.81,13.47 16,14.74V17A1,1 0 0,1 15,18H9A1,1 0 0,1 8,17V14.74C6.19,13.47 5,11.38 5,9A7,7 0 0,1 12,2M9,21V20H15V21A1,1 0 0,1 14,22H10A1,1 0 0,1 9,21M12,4A5,5 0 0,0 7,9C7,11.05 8.23,12.81 10,13.58V16H14V13.58C15.77,12.81 17,11.05 17,9A5,5 0 0,0 12,4Z'
+        : 'M12,2A7,7 0 0,1 19,9C19,11.38 17.81,13.47 16,14.74V17A1,1 0 0,1 15,18H9A1,1 0 0,1 8,17V14.74C6.19,13.47 5,11.38 5,9A7,7 0 0,1 12,2M9,21V20H15V21A1,1 0 0,1 14,22H10A1,1 0 0,1 9,21M12,4A5,5 0 0,0 7,9C7,11.05 8.23,12.81 10,13.58V16H14V13.58C15.77,12.81 17,11.05 17,9A5,5 0 0,0 12,4Z'
+      const icon = `<svg viewBox="0 0 24 24" fill="${bulbColor}"><path d="${bulbPath}"/></svg>`
       return `<div class="lx-room-card${anyOn ? ' lx-any-on' : ''}" data-room-idx="${idx}">
-        <div class="lx-room-icon" style="font-size:${anyOn?'1.5rem':'1rem'};color:${anyOn?'inherit':'#444'}">${icon}</div>
+        <div class="lx-room-icon">${icon}</div>
         <div class="lx-room-name">${room.name}</div>
         <div class="lx-room-status${anyOn ? ' lx-some-on' : ''}">${status}</div>
         <div class="lx-room-chevron">›</div>
