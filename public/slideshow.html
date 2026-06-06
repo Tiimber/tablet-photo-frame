@@ -1807,27 +1807,36 @@
       document.getElementById('db-weather-row').innerHTML = ''
     }
 
-    // Electricity – nordpool raw slots, line graph + carousel
+    // Electricity – nordpool today/tomorrow float arrays, line graph + carousel
     try {
       const priceColor = v => v <= 0.5 ? '#4caf50' : v <= 1.2 ? '#8bc34a' : v <= 2.0 ? '#ffc107' : '#f44336'
       const r = await fetch('/api/ha-template', {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ template: "{{ state_attr('sensor.nordpool','raw_today') | tojson }} ||| {{ state_attr('sensor.nordpool','raw_tomorrow') | tojson }}" })
+        body: JSON.stringify({ template: "{{ state_attr('sensor.nordpool','today') | tojson }} ||| {{ state_attr('sensor.nordpool','tomorrow') | tojson }}" })
       })
       if (!r.ok) throw new Error()
       const txt = (await r.text()).trim()
       const [todayStr, tomorrowStr] = txt.split(' ||| ')
-      const rawToday    = JSON.parse(todayStr)
-      const rawTomorrow = JSON.parse(tomorrowStr)
-      const allSlots = [...rawToday, ...rawTomorrow]
+      const todayVals    = JSON.parse(todayStr) || []
+      const tomorrowVals = JSON.parse(tomorrowStr) || []
+
+      // Build slot objects: index = minutes from local midnight / 15
+      const localMidnight = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime() }
+      const tomorrowMidnight = localMidnight() + 86400000
+      const allSlots = [
+        ...todayVals.map((v, i) => ({ value: v, t: localMidnight() + i * 15 * 60000 })),
+        ...tomorrowVals.map((v, i) => ({ value: v, t: tomorrowMidnight + i * 15 * 60000 }))
+      ]
 
       const now = Date.now()
-      const curIdx = allSlots.findIndex(s => new Date(s.start).getTime() <= now && now < new Date(s.end).getTime())
+      const curIdx = allSlots.findIndex((s, i) => {
+        const next = allSlots[i+1]
+        return s.t <= now && (!next || now < next.t)
+      })
       const startIdx = curIdx >= 0 ? curIdx : 0
-      // up to 96 slots from now (24h of 15-min slots)
       const slots = allSlots.slice(startIdx, startIdx + 96)
 
-      // Current price display
+      // Current price
       const curVal = slots[0] ? slots[0].value : null
       const elP = document.getElementById('db-elec-price')
       elP.textContent = curVal !== null ? curVal.toFixed(2) : '—'
@@ -1840,71 +1849,54 @@
       svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
       const vals = slots.map(s => s.value)
       const maxV = Math.ceil(Math.max(...vals))
-      const minV = 0
-      const range = maxV - minV || 1
-      const px = (i) => (i / (vals.length - 1)) * W
-      const py = (v) => H - ((v - minV) / range) * (H - 4) - 2
+      const py = v => H - (v / (maxV || 1)) * (H - 6) - 3
+      const px = i => vals.length > 1 ? (i / (vals.length - 1)) * W : 0
 
-      // Colored polyline segments
-      let pathD = ''
-      const segPaths = {}
-      vals.forEach((v, i) => {
-        const c = priceColor(v)
-        if (!segPaths[c]) segPaths[c] = ''
-        if (i === 0 || priceColor(vals[i-1]) !== c) {
-          // start new segment or continue — use M for first point of color run
-          const prev = i > 0 ? `L${px(i).toFixed(1)},${py(v).toFixed(1)}` : `M${px(i).toFixed(1)},${py(v).toFixed(1)}`
-          // build per-color paths with bridging
-          segPaths[c] += (i > 0 ? `M${px(i-1).toFixed(1)},${py(vals[i-1]).toFixed(1)}L` : 'M') + `${px(i).toFixed(1)},${py(v).toFixed(1)}`
-        } else {
-          segPaths[c] += `L${px(i).toFixed(1)},${py(v).toFixed(1)}`
-        }
-      })
       svg.innerHTML = ''
-      // y-axis labels
+      // grid lines
       for (let y = 0; y <= maxV; y++) {
         const yp = py(y)
-        const line = document.createElementNS('http://www.w3.org/2000/svg','line')
-        line.setAttribute('x1','0'); line.setAttribute('x2',W)
-        line.setAttribute('y1',yp.toFixed(1)); line.setAttribute('y2',yp.toFixed(1))
-        line.setAttribute('stroke','#2a2a2a'); line.setAttribute('stroke-width','1')
-        svg.appendChild(line)
+        const gl = document.createElementNS('http://www.w3.org/2000/svg','line')
+        gl.setAttribute('x1','0'); gl.setAttribute('x2',W)
+        gl.setAttribute('y1',yp.toFixed(1)); gl.setAttribute('y2',yp.toFixed(1))
+        gl.setAttribute('stroke','#2a2a2a'); gl.setAttribute('stroke-width','1')
+        svg.appendChild(gl)
         const lbl = document.createElementNS('http://www.w3.org/2000/svg','text')
         lbl.setAttribute('x','2'); lbl.setAttribute('y',(yp - 2).toFixed(1))
         lbl.setAttribute('fill','#444'); lbl.setAttribute('font-size','8')
         lbl.textContent = y
         svg.appendChild(lbl)
       }
-      // current time marker
-      if (vals.length > 0) {
-        const marker = document.createElementNS('http://www.w3.org/2000/svg','line')
-        marker.setAttribute('x1', px(0).toFixed(1)); marker.setAttribute('x2', px(0).toFixed(1))
-        marker.setAttribute('y1','0'); marker.setAttribute('y2',H)
-        marker.setAttribute('stroke','rgba(255,255,255,0.3)'); marker.setAttribute('stroke-width','1')
-        svg.appendChild(marker)
-      }
+      // color-coded path segments (bridge across color changes)
+      const segPaths = {}
+      vals.forEach((v, i) => {
+        const c = priceColor(v)
+        if (!segPaths[c]) segPaths[c] = ''
+        const x = px(i).toFixed(1), y = py(v).toFixed(1)
+        if (i === 0 || priceColor(vals[i-1]) !== c) {
+          segPaths[c] += (i > 0 ? `M${px(i-1).toFixed(1)},${py(vals[i-1]).toFixed(1)}L` : 'M') + `${x},${y}`
+        } else {
+          segPaths[c] += `L${x},${y}`
+        }
+      })
       Object.entries(segPaths).forEach(([color, d]) => {
         const path = document.createElementNS('http://www.w3.org/2000/svg','path')
-        path.setAttribute('d', d)
-        path.setAttribute('fill','none')
-        path.setAttribute('stroke', color)
-        path.setAttribute('stroke-width','2')
-        path.setAttribute('stroke-linecap','round')
-        path.setAttribute('stroke-linejoin','round')
+        path.setAttribute('d', d); path.setAttribute('fill','none')
+        path.setAttribute('stroke', color); path.setAttribute('stroke-width','2')
+        path.setAttribute('stroke-linecap','round'); path.setAttribute('stroke-linejoin','round')
         svg.appendChild(path)
       })
 
-      // Carousel slots — show hourly (every 4th slot = 1hr) for readability
+      // Carousel – hourly pills
       const carousel = document.getElementById('db-elec-carousel')
       carousel.innerHTML = ''
       slots.forEach((s, i) => {
-        if (i % 4 !== 0) return  // hourly only
-        const t = new Date(s.start)
-        const hh = t.getHours().toString().padStart(2,'0')
-        const mm = t.getMinutes().toString().padStart(2,'0')
+        if (i % 4 !== 0) return
+        const d = new Date(s.t)
+        const hh = d.getHours().toString().padStart(2,'0')
         const pill = document.createElement('div')
         pill.className = 'db-elec-slot' + (i === 0 ? ' current' : '')
-        pill.innerHTML = `<div class="db-elec-slot-time">${hh}:${mm}</div><div class="db-elec-slot-val" style="color:${priceColor(s.value)}">${s.value.toFixed(2)}</div>`
+        pill.innerHTML = `<div class="db-elec-slot-time">${hh}:00</div><div class="db-elec-slot-val" style="color:${priceColor(s.value)}">${s.value.toFixed(2)}</div>`
         carousel.appendChild(pill)
       })
     } catch(e) { document.getElementById('db-elec-price').textContent = '—' }
