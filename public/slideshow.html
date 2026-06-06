@@ -827,14 +827,6 @@ I did<!DOCTYPE html>
   .cc-charge-soc-val { font-size: 0.95rem; font-weight: 600; color: #ddd; min-width: 36px; text-align: center; }
   .cc-charge-soc-val.cc-pending { color: #555; }
   .cc-charge-updating { font-size: 0.65rem; color: #555; font-style: italic; }
-  /* Departure time editable */
-  .cc-departure-input {
-    background: none; border: none; border-bottom: 1px solid #3a3a3a;
-    color: #ddd; font-size: 0.95rem; font-weight: 600; width: 70px;
-    outline: none; padding: 0; cursor: text;
-  }
-  .cc-departure-input:focus { border-bottom-color: #4a9eff; }
-
   /* Camera feeds — wrap row, min 500px each, stretch to fill row */
   .cc-cameras {
     display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0;
@@ -850,8 +842,25 @@ I did<!DOCTYPE html>
     background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px;
     pointer-events: none; z-index: 1;
   }
-  .cc-camera-img { width: 100%; display: block; object-fit: cover; background: #111; }
+  .cc-camera-img { width: 100%; height: 400px; display: block; object-fit: cover; background: #111; }
   .cc-camera-unavail { color: #333; font-size: 0.75rem; padding: 20px; text-align: center; }
+
+  /* Charging plan full-size lightbox */
+  #cc-charge-lightbox {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    z-index: 2000; align-items: center; justify-content: center; cursor: zoom-out;
+  }
+  #cc-charge-lightbox.open { display: flex; }
+  #cc-charge-lightbox img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 6px; }
+
+  /* Departure input — wider, light text, visible clock icon */
+  .cc-departure-input {
+    background: none; border: none; border-bottom: 1px solid #3a3a3a;
+    color: #ddd; font-size: 0.95rem; font-weight: 600; width: 100px;
+    outline: none; padding: 2px 0; cursor: text;
+    color-scheme: dark;
+  }
+  .cc-departure-input:focus { border-bottom-color: #4a9eff; }
 </style>
 </head>
 <body class="fit-cover">
@@ -947,7 +956,7 @@ I did<!DOCTYPE html>
             <div class="db-card cc-charge-card">
               <div class="db-info-label">🚗 Car Charging</div>
               <div class="cc-charge-body">
-                <div class="cc-charge-img-wrap" id="cc-charge-img-wrap">
+                <div class="cc-charge-img-wrap" id="cc-charge-img-wrap" onclick="ccOpenChargeLightbox()" style="cursor:zoom-in">
                   <div class="cc-charge-img-placeholder">📋</div>
                 </div>
                 <div class="cc-charge-controls">
@@ -1126,6 +1135,11 @@ I did<!DOCTYPE html>
       </div>
     </div>
   </div>
+</div>
+
+<!-- Charging plan full-size lightbox -->
+<div id="cc-charge-lightbox" onclick="this.classList.remove('open')">
+  <img id="cc-charge-lightbox-img" src="" alt="Charging plan">
 </div>
 
 <!-- Delete confirmation dialog -->
@@ -2791,13 +2805,26 @@ I did<!DOCTYPE html>
     const wrap = document.getElementById('cc-charge-img-wrap')
     if (!wrap) return
     const ts = Date.now()
+    const src = '/api/ha-camera/camera.charging_plan_report?t=' + ts
     const img = document.createElement('img')
     img.className = 'cc-charge-img'
     img.alt = 'Charging plan'
     img.onerror = () => { wrap.innerHTML = '<div class="cc-charge-img-placeholder">📋</div>' }
     img.onload = () => { wrap.innerHTML = ''; wrap.appendChild(img) }
-    img.src = '/api/ha-camera/camera.charging_plan_report?t=' + ts
+    img.src = src
   }
+
+  function ccOpenChargeLightbox() {
+    const wrap = document.getElementById('cc-charge-img-wrap')
+    const existingImg = wrap ? wrap.querySelector('img') : null
+    if (!existingImg) return
+    const lb = document.getElementById('cc-charge-lightbox')
+    const lbImg = document.getElementById('cc-charge-lightbox-img')
+    if (!lb || !lbImg) return
+    lbImg.src = existingImg.src
+    lb.classList.add('open')
+  }
+  window.ccOpenChargeLightbox = ccOpenChargeLightbox
 
   async function ccSocAdjust(delta) {
     const el = document.getElementById('cc-soc-val')
