@@ -1887,16 +1887,16 @@
         svg.appendChild(path)
       })
 
-      // Carousel – hourly pills
+      // Carousel – one pill per 15-min slot
       const carousel = document.getElementById('db-elec-carousel')
       carousel.innerHTML = ''
       slots.forEach((s, i) => {
-        if (i % 4 !== 0) return
         const d = new Date(s.t)
         const hh = d.getHours().toString().padStart(2,'0')
+        const mm = d.getMinutes().toString().padStart(2,'0')
         const pill = document.createElement('div')
         pill.className = 'db-elec-slot' + (i === 0 ? ' current' : '')
-        pill.innerHTML = `<div class="db-elec-slot-time">${hh}:00</div><div class="db-elec-slot-val" style="color:${priceColor(s.value)}">${s.value.toFixed(2)}</div>`
+        pill.innerHTML = `<div class="db-elec-slot-time">${hh}:${mm}</div><div class="db-elec-slot-val" style="color:${priceColor(s.value)}">${s.value.toFixed(2)}</div>`
         carousel.appendChild(pill)
       })
     } catch(e) { document.getElementById('db-elec-price').textContent = '—' }
