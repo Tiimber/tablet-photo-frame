@@ -277,6 +277,26 @@
   .db-wx-detail { font-size: 0.72rem; color: #777; }
   .db-wx-detail span { color: #aaa; }
 
+  /* Electricity card */
+  .db-elec-card { flex-shrink: 0; }
+  .db-elec-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .db-elec-current { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+  .db-elec-unit { font-size: 0.75rem; color: #555; }
+  .db-elec-graph { width: 100%; height: 70px; display: block; margin-bottom: 8px; }
+  .db-elec-carousel {
+    display: flex; gap: 5px; overflow-x: auto; padding-bottom: 4px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .db-elec-carousel::-webkit-scrollbar { display: none; }
+  .db-elec-slot {
+    flex: 0 0 auto; display: flex; flex-direction: column; align-items: center;
+    gap: 2px; padding: 5px 7px; border-radius: 8px;
+    background: #222; border: 1px solid #333; min-width: 38px;
+  }
+  .db-elec-slot.current { border-color: #fff; background: #2a2a2a; }
+  .db-elec-slot-time { font-size: 0.6rem; color: #555; white-space: nowrap; }
+  .db-elec-slot-val { font-size: 0.78rem; font-weight: 600; }
+
   /* 8-day compact strip */
   .db-weather-row {
     display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; flex-shrink: 0;
@@ -691,17 +711,21 @@
         </div>
         <div id="db-weather-row" class="db-weather-row" style="margin-top:6px"></div>
 
-        <!-- Info cards row -->
-        <div class="db-row db-row-wrap">
-          <div class="db-card db-card-info">
+        <!-- Electricity card (full width) -->
+        <div class="db-card db-elec-card">
+          <div class="db-elec-header">
             <div class="db-info-label">💡 Electricity</div>
-            <div class="db-info-value" id="db-elec-price" style="font-weight:700">—</div>
-            <div class="db-info-sub" id="db-elec-sub" style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><span style="color:#888;font-size:0.75em">next:</span><span id="db-elec-next" style="font-weight:600">—</span></div>
+            <div class="db-elec-current" id="db-elec-price">—</div>
+            <div class="db-elec-unit">kr/kWh</div>
           </div>
-          <div class="db-card db-card-info">
-            <div class="db-info-label">🚗 Charging plan</div>
-            <div class="db-info-value db-info-value-sm" id="db-car-charge">—</div>
-          </div>
+          <svg class="db-elec-graph" id="db-elec-graph" preserveAspectRatio="none"></svg>
+          <div class="db-elec-carousel" id="db-elec-carousel"></div>
+        </div>
+
+        <!-- Charging plan card -->
+        <div class="db-card db-card-info">
+          <div class="db-info-label">🚗 Charging plan</div>
+          <div class="db-info-value db-info-value-sm" id="db-car-charge">—</div>
         </div>
       </div>
 
@@ -1783,25 +1807,107 @@
       document.getElementById('db-weather-row').innerHTML = ''
     }
 
-    // Electricity price – current (incl fees) + tier color + next hour spot
+    // Electricity – nordpool raw slots, line graph + carousel
     try {
-      const tierColor = t => ({ very_cheap:'#4caf50', cheap:'#8bc34a', acceptable:'#ffc107', expensive:'#f44336' }[t] || '#fff')
-      const spotColor = v => v <= 0.1 ? '#4caf50' : v <= 1.5 ? '#8bc34a' : v <= 2.5 ? '#ffc107' : '#f44336'
-      const [rPrice, rTier, rNext] = await Promise.all([
-        fetch('/api/ha-template', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ template:"{{ states('sensor.current_price_incl_fees') | round(2) }}" }) }),
-        fetch('/api/ha-template', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ template:"{{ states('sensor.ac_simulation_price_tier') }}" }) }),
-        fetch('/api/ha-template', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ template:"{{ states('sensor.electricity_next_price') | round(2) }}" }) })
-      ])
-      const price = rPrice.ok ? (await rPrice.text()).trim() : null
-      const tier  = rTier.ok  ? (await rTier.text()).trim()  : null
-      const next  = rNext.ok  ? (await rNext.text()).trim()  : null
+      const priceColor = v => v <= 0.5 ? '#4caf50' : v <= 1.2 ? '#8bc34a' : v <= 2.0 ? '#ffc107' : '#f44336'
+      const r = await fetch('/api/ha-template', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ template: "{{ state_attr('sensor.nordpool','raw_today') | tojson }} ||| {{ state_attr('sensor.nordpool','raw_tomorrow') | tojson }}" })
+      })
+      if (!r.ok) throw new Error()
+      const txt = (await r.text()).trim()
+      const [todayStr, tomorrowStr] = txt.split(' ||| ')
+      const rawToday    = JSON.parse(todayStr)
+      const rawTomorrow = JSON.parse(tomorrowStr)
+      const allSlots = [...rawToday, ...rawTomorrow]
+
+      const now = Date.now()
+      const curIdx = allSlots.findIndex(s => new Date(s.start).getTime() <= now && now < new Date(s.end).getTime())
+      const startIdx = curIdx >= 0 ? curIdx : 0
+      // up to 96 slots from now (24h of 15-min slots)
+      const slots = allSlots.slice(startIdx, startIdx + 96)
+
+      // Current price display
+      const curVal = slots[0] ? slots[0].value : null
       const elP = document.getElementById('db-elec-price')
-      const elN = document.getElementById('db-elec-next')
-      elP.textContent = price ? price + ' kr/kWh' : '—'
-      elP.style.color = tier ? tierColor(tier) : '#fff'
-      elN.textContent = next ? next + ' kr' : '—'
-      elN.style.color = next ? spotColor(parseFloat(next)) : '#fff'
-    } catch { document.getElementById('db-elec-price').textContent = '—' }
+      elP.textContent = curVal !== null ? curVal.toFixed(2) : '—'
+      elP.style.color = curVal !== null ? priceColor(curVal) : '#ddd'
+
+      // Line graph
+      const svg = document.getElementById('db-elec-graph')
+      const W = svg.getBoundingClientRect().width || 300
+      const H = 70
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
+      const vals = slots.map(s => s.value)
+      const maxV = Math.ceil(Math.max(...vals))
+      const minV = 0
+      const range = maxV - minV || 1
+      const px = (i) => (i / (vals.length - 1)) * W
+      const py = (v) => H - ((v - minV) / range) * (H - 4) - 2
+
+      // Colored polyline segments
+      let pathD = ''
+      const segPaths = {}
+      vals.forEach((v, i) => {
+        const c = priceColor(v)
+        if (!segPaths[c]) segPaths[c] = ''
+        if (i === 0 || priceColor(vals[i-1]) !== c) {
+          // start new segment or continue — use M for first point of color run
+          const prev = i > 0 ? `L${px(i).toFixed(1)},${py(v).toFixed(1)}` : `M${px(i).toFixed(1)},${py(v).toFixed(1)}`
+          // build per-color paths with bridging
+          segPaths[c] += (i > 0 ? `M${px(i-1).toFixed(1)},${py(vals[i-1]).toFixed(1)}L` : 'M') + `${px(i).toFixed(1)},${py(v).toFixed(1)}`
+        } else {
+          segPaths[c] += `L${px(i).toFixed(1)},${py(v).toFixed(1)}`
+        }
+      })
+      svg.innerHTML = ''
+      // y-axis labels
+      for (let y = 0; y <= maxV; y++) {
+        const yp = py(y)
+        const line = document.createElementNS('http://www.w3.org/2000/svg','line')
+        line.setAttribute('x1','0'); line.setAttribute('x2',W)
+        line.setAttribute('y1',yp.toFixed(1)); line.setAttribute('y2',yp.toFixed(1))
+        line.setAttribute('stroke','#2a2a2a'); line.setAttribute('stroke-width','1')
+        svg.appendChild(line)
+        const lbl = document.createElementNS('http://www.w3.org/2000/svg','text')
+        lbl.setAttribute('x','2'); lbl.setAttribute('y',(yp - 2).toFixed(1))
+        lbl.setAttribute('fill','#444'); lbl.setAttribute('font-size','8')
+        lbl.textContent = y
+        svg.appendChild(lbl)
+      }
+      // current time marker
+      if (vals.length > 0) {
+        const marker = document.createElementNS('http://www.w3.org/2000/svg','line')
+        marker.setAttribute('x1', px(0).toFixed(1)); marker.setAttribute('x2', px(0).toFixed(1))
+        marker.setAttribute('y1','0'); marker.setAttribute('y2',H)
+        marker.setAttribute('stroke','rgba(255,255,255,0.3)'); marker.setAttribute('stroke-width','1')
+        svg.appendChild(marker)
+      }
+      Object.entries(segPaths).forEach(([color, d]) => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg','path')
+        path.setAttribute('d', d)
+        path.setAttribute('fill','none')
+        path.setAttribute('stroke', color)
+        path.setAttribute('stroke-width','2')
+        path.setAttribute('stroke-linecap','round')
+        path.setAttribute('stroke-linejoin','round')
+        svg.appendChild(path)
+      })
+
+      // Carousel slots — show hourly (every 4th slot = 1hr) for readability
+      const carousel = document.getElementById('db-elec-carousel')
+      carousel.innerHTML = ''
+      slots.forEach((s, i) => {
+        if (i % 4 !== 0) return  // hourly only
+        const t = new Date(s.start)
+        const hh = t.getHours().toString().padStart(2,'0')
+        const mm = t.getMinutes().toString().padStart(2,'0')
+        const pill = document.createElement('div')
+        pill.className = 'db-elec-slot' + (i === 0 ? ' current' : '')
+        pill.innerHTML = `<div class="db-elec-slot-time">${hh}:${mm}</div><div class="db-elec-slot-val" style="color:${priceColor(s.value)}">${s.value.toFixed(2)}</div>`
+        carousel.appendChild(pill)
+      })
+    } catch(e) { document.getElementById('db-elec-price').textContent = '—' }
 
     // Car charging plan
     try {
