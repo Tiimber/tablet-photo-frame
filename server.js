@@ -487,6 +487,36 @@ app.post('/api/remote/settings', (req, res) => {
   res.json({ ok: true })
 })
 
+// ── HA state proxy — lets frontend fetch any entity without exposing token ──
+app.get('/api/ha-state/:entity', async (req, res) => {
+  const ha = loadHASync()
+  if (!ha || !ha.url || !ha.token) return res.status(503).json({ error: 'HA not configured' })
+  try {
+    const r = await fetch(`${ha.url.replace(/\/$/,'')}/api/states/${req.params.entity}`, {
+      headers: { 'Authorization': 'Bearer ' + ha.token }
+    })
+    if (!r.ok) return res.status(r.status).json({ error: 'HA error' })
+    res.json(await r.json())
+  } catch(e) { res.status(502).json({ error: String(e) }) }
+})
+
+// HA template proxy — evaluate a Jinja2 template via HA API
+app.post('/api/ha-template', express.json(), async (req, res) => {
+  const ha = loadHASync()
+  if (!ha || !ha.url || !ha.token) return res.status(503).json({ error: 'HA not configured' })
+  const { template } = req.body || {}
+  if (!template) return res.status(400).json({ error: 'template required' })
+  try {
+    const r = await fetch(`${ha.url.replace(/\/$/,'')}/api/template`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + ha.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template })
+    })
+    if (!r.ok) return res.status(r.status).json({ error: 'HA error' })
+    res.type('text').send(await r.text())
+  } catch(e) { res.status(502).json({ error: String(e) }) }
+})
+
 // Dashboard toggle — callable from HA rest_command
 app.post('/api/remote/dashboard', (req, res) => {
   broadcast({ type: 'remote-dashboard' })

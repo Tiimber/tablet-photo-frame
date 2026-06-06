@@ -161,6 +161,33 @@ The system can sync with Home Assistant input controls:
 - `input_select.slideshow_fit` - Cover or contain
 - `input_boolean.slideshow_kenburns` - Ken Burns effect toggle
 
+### Remote Control via `rest_command`
+
+Add to your HA `configuration.yaml`:
+
+```yaml
+rest_command:
+  slideshow_next:
+    url: http://192.168.68.50:3000/api/remote/next
+    method: POST
+  slideshow_prev:
+    url: http://192.168.68.50:3000/api/remote/prev
+    method: POST
+  slideshow_toggle_pause:
+    url: http://192.168.68.50:3000/api/remote/toggle-pause
+    method: POST
+  slideshow_dashboard:
+    url: http://192.168.68.50:3000/api/remote/dashboard
+    method: POST
+  slideshow_settings:
+    url: http://192.168.68.50:3000/api/remote/settings
+    method: POST
+```
+
+- `slideshow_dashboard` — toggles the dashboard overlay open/closed; pauses the slideshow while open
+- When the dashboard is open, `slideshow_next` / `slideshow_prev` navigate between dashboard screens (Summary → Control Center → Lights → Sensors)
+- When the dashboard is closed, `slideshow_next` / `slideshow_prev` advance the photo slideshow
+
 ## Mobile Improvements
 
 - Collapsible upload section (saves vertical space)

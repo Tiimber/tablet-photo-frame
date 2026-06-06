@@ -169,20 +169,15 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.92);
+    background: rgba(0,0,0,0.93);
     z-index: 800;
     flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding: 40px 24px 24px;
-    overflow-y: auto;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     animation: db-slide-in 0.28s cubic-bezier(0.22,1,0.36,1) both;
+    overflow: hidden;
   }
   #dashboard-overlay.open { display: flex; }
-  #dashboard-overlay.closing {
-    animation: db-slide-out 0.22s ease-in both;
-  }
+  #dashboard-overlay.closing { animation: db-slide-out 0.22s ease-in both; }
   @keyframes db-slide-in {
     from { transform: translateY(-100%); opacity: 0; }
     to   { transform: translateY(0);     opacity: 1; }
@@ -193,60 +188,102 @@
   }
 
   #dashboard-close {
-    position: absolute;
-    top: 14px; right: 18px;
+    position: absolute; top: 14px; right: 18px;
     background: none; border: none;
-    color: #555; font-size: 1.8rem; cursor: pointer; line-height: 1;
+    color: #555; font-size: 1.8rem; cursor: pointer; line-height: 1; z-index: 10;
   }
   #dashboard-close:hover { color: #ccc; }
 
   #dashboard-swipe-hint {
-    position: absolute;
-    top: 10px; left: 50%; transform: translateX(-50%);
-    width: 40px; height: 4px;
-    background: #444; border-radius: 2px;
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 4px; background: #444; border-radius: 2px; z-index: 10;
   }
 
-  .db-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 16px;
-    width: 100%;
-    max-width: 700px;
-    margin-top: 8px;
+  /* Dots */
+  #db-dots {
+    display: flex; gap: 8px; justify-content: center;
+    padding: 28px 0 8px; flex-shrink: 0; z-index: 10;
+  }
+  .db-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #444; transition: background 0.2s, transform 0.2s;
+  }
+  .db-dot.active { background: #fff; transform: scale(1.25); }
+
+  /* Carousel */
+  #db-viewport { flex: 1; overflow: hidden; position: relative; }
+  #db-track {
+    display: flex; height: 100%;
+    transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+    will-change: transform;
+  }
+  .db-screen {
+    flex: 0 0 100vw; width: 100vw; height: 100%;
+    overflow-y: auto; padding: 12px 20px 24px;
+    display: flex; flex-direction: column; gap: 12px;
   }
 
+  .db-screen-title {
+    font-size: 1.1rem; font-weight: 600; color: #888;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding-bottom: 4px; flex-shrink: 0;
+  }
+
+  /* Cards */
   .db-card {
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    border-radius: 16px;
-    padding: 20px 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    min-height: 120px;
-    justify-content: center;
+    background: #1a1a1a; border: 1px solid #2a2a2a;
+    border-radius: 14px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 6px;
   }
+  .db-card-clock {
+    flex-direction: row; align-items: center; gap: 16px; padding: 16px 20px;
+  }
+  #db-clock { font-size: 3rem; font-weight: 200; color: #fff; letter-spacing: -0.02em; line-height: 1; }
+  #db-date  { font-size: 0.85rem; color: #777; }
 
-  /* Clock card */
-  #db-clock { font-size: 2.8rem; font-weight: 200; color: #fff; letter-spacing: -0.02em; line-height: 1; }
-  #db-date  { font-size: 0.82rem; color: #888; letter-spacing: 0.04em; }
+  /* Rows */
+  .db-row { display: flex; gap: 12px; flex-shrink: 0; }
+  .db-row-wrap { flex-wrap: wrap; }
+  .db-row .db-card { flex: 1; min-width: 140px; }
 
-  /* Stat cards */
-  .db-stat-icon { font-size: 1.6rem; }
-  .db-stat-label { font-size: 0.72rem; color: #666; text-transform: uppercase; letter-spacing: 0.06em; }
-  .db-stat-value { font-size: 1.5rem; font-weight: 600; color: #ddd; }
-  .db-stat-unit  { font-size: 0.75rem; color: #555; }
+  /* Info cards */
+  .db-info-label { font-size: 0.72rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+  .db-info-value { font-size: 1.4rem; font-weight: 600; color: #ddd; line-height: 1.2; }
+  .db-info-value-sm { font-size: 0.88rem; font-weight: 400; color: #bbb; line-height: 1.4; }
+  .db-info-sub  { font-size: 0.78rem; color: #555; }
+
+  /* Section label */
+  .db-section-label { font-size: 0.72rem; color: #555; text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; }
+
+  /* Weather row */
+  .db-weather-row {
+    display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; flex-shrink: 0;
+    scrollbar-width: none;
+  }
+  .db-weather-row::-webkit-scrollbar { display: none; }
+  .db-weather-day {
+    flex: 0 0 auto; background: #1a1a1a; border: 1px solid #2a2a2a;
+    border-radius: 12px; padding: 10px 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    min-width: 64px;
+  }
+  .db-weather-day.today { border-color: #3a5a8a; background: #1a2a3a; }
+  .db-weather-dow  { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+  .db-weather-icon { font-size: 1.6rem; line-height: 1; }
+  .db-weather-hi   { font-size: 0.95rem; font-weight: 600; color: #ddd; }
+  .db-weather-lo   { font-size: 0.78rem; color: #555; }
+  .db-weather-loading { color: #444; font-size: 0.85rem; padding: 12px; }
+
+  /* Placeholder screens */
+  .db-placeholder {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; color: #333; font-size: 2rem; gap: 12px;
+    text-align: center; line-height: 1.4;
+  }
 
   /* Shortcut card */
-  .db-shortcut {
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-  }
+  .db-shortcut { cursor: pointer; transition: background 0.15s; align-items: center; }
   .db-shortcut:active { background: #252525; }
-  .db-shortcut-icon  { font-size: 2rem; }
-  .db-shortcut-label { font-size: 0.8rem; color: #888; text-align: center; }
 
   /* Settings overlay */
   #settings-overlay {
@@ -595,37 +632,72 @@
 <div id="dashboard-overlay">
   <div id="dashboard-swipe-hint"></div>
   <button id="dashboard-close" onclick="closeDashboard()">✕</button>
-  <div class="db-grid">
 
-    <!-- Clock card -->
-    <div class="db-card" style="grid-column: span 2;">
-      <div id="db-clock">00:00</div>
-      <div id="db-date">—</div>
-    </div>
-
-    <!-- Placeholder: weather stat -->
-    <div class="db-card">
-      <div class="db-stat-icon">🌡️</div>
-      <div class="db-stat-label">Indoor</div>
-      <div class="db-stat-value" id="db-temp">—</div>
-      <div class="db-stat-unit">°C</div>
-    </div>
-
-    <!-- Placeholder: another stat -->
-    <div class="db-card">
-      <div class="db-stat-icon">💧</div>
-      <div class="db-stat-label">Humidity</div>
-      <div class="db-stat-value" id="db-humidity">—</div>
-      <div class="db-stat-unit">%</div>
-    </div>
-
-    <!-- Placeholder: shortcut button -->
-    <div class="db-card db-shortcut" onclick="dbShortcut('lights_off')" title="Lights off">
-      <div class="db-shortcut-icon">💡</div>
-      <div class="db-shortcut-label">Lights off</div>
-    </div>
-
+  <!-- Screen indicator dots -->
+  <div id="db-dots">
+    <span class="db-dot active" data-screen="0"></span>
+    <span class="db-dot" data-screen="1"></span>
+    <span class="db-dot" data-screen="2"></span>
+    <span class="db-dot" data-screen="3"></span>
   </div>
+
+  <!-- Carousel viewport -->
+  <div id="db-viewport">
+    <div id="db-track">
+
+      <!-- ── Screen 0: Summary ─────────────────────────────────────── -->
+      <div class="db-screen" id="db-screen-0">
+        <div class="db-screen-title">Summary</div>
+
+        <!-- Clock row -->
+        <div class="db-row">
+          <div class="db-card db-card-clock">
+            <div id="db-clock">00:00</div>
+            <div id="db-date">—</div>
+          </div>
+        </div>
+
+        <!-- Weather 10-day forecast -->
+        <div class="db-section-label">Weather forecast</div>
+        <div id="db-weather-row" class="db-weather-row">
+          <!-- Injected by JS: .db-weather-day items -->
+          <div class="db-weather-loading">Loading…</div>
+        </div>
+
+        <!-- Info cards row -->
+        <div class="db-row db-row-wrap">
+          <div class="db-card db-card-info">
+            <div class="db-info-label">⚡ Electricity</div>
+            <div class="db-info-value" id="db-elec-price">—</div>
+            <div class="db-info-sub" id="db-elec-sub"></div>
+          </div>
+          <div class="db-card db-card-info">
+            <div class="db-info-label">🚗 Charging plan</div>
+            <div class="db-info-value db-info-value-sm" id="db-car-charge">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Screen 1: Control Center ──────────────────────────────── -->
+      <div class="db-screen" id="db-screen-1">
+        <div class="db-screen-title">Control Center</div>
+        <div class="db-placeholder">🎛️<br>Coming soon</div>
+      </div>
+
+      <!-- ── Screen 2: Lights ──────────────────────────────────────── -->
+      <div class="db-screen" id="db-screen-2">
+        <div class="db-screen-title">Lights</div>
+        <div class="db-placeholder">💡<br>Coming soon</div>
+      </div>
+
+      <!-- ── Screen 3: Sensors ─────────────────────────────────────── -->
+      <div class="db-screen" id="db-screen-3">
+        <div class="db-screen-title">Sensors</div>
+        <div class="db-placeholder">📡<br>Coming soon</div>
+      </div>
+
+    </div><!-- /db-track -->
+  </div><!-- /db-viewport -->
 </div>
 
 <!-- Settings overlay (long-press) -->
@@ -1565,31 +1637,106 @@
   })
 
   // ── Dashboard overlay ────────────────────────────────────────────────────
-  const dashboardEl = document.getElementById('dashboard-overlay')
-  let dashboardOpen = false
-  let dbClockTimer = null
+  const dashboardEl  = document.getElementById('dashboard-overlay')
+  const dbTrack      = document.getElementById('db-track')
+  const dbDots       = document.querySelectorAll('.db-dot')
+  const DB_SCREENS   = 4
+  let dashboardOpen  = false
+  let dbScreen       = 0
+  let dbClockTimer   = null
+
+  function dbSetScreen(n, animate = true) {
+    n = Math.max(0, Math.min(DB_SCREENS - 1, n))
+    dbScreen = n
+    dbTrack.style.transition = animate ? 'transform 0.32s cubic-bezier(0.4,0,0.2,1)' : 'none'
+    dbTrack.style.transform  = `translateX(${-n * 100}vw)`
+    dbDots.forEach((d, i) => d.classList.toggle('active', i === n))
+  }
+
+  function dbNextScreen() { dbSetScreen(dbScreen + 1) }
+  function dbPrevScreen() { dbSetScreen(dbScreen - 1) }
 
   function updateDbClock() {
     const now = new Date()
     const hh = String(now.getHours()).padStart(2,'0')
     const mm = String(now.getMinutes()).padStart(2,'0')
     document.getElementById('db-clock').textContent = hh + ':' + mm
-    document.getElementById('db-date').textContent = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' })
+    document.getElementById('db-date').textContent  = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' })
+  }
+
+  // HA weather condition → emoji
+  function weatherIcon(cond) {
+    const map = {
+      'clear-night':'🌙','cloudy':'☁️','exceptional':'⚠️','fog':'🌫️',
+      'hail':'🌨️','lightning':'⚡','lightning-rainy':'⛈️','partlycloudy':'⛅',
+      'pouring':'🌧️','rainy':'🌦️','snowy':'❄️','snowy-rainy':'🌨️',
+      'sunny':'☀️','windy':'💨','windy-variant':'🌬️'
+    }
+    return map[cond] || '🌡️'
+  }
+
+  async function dbLoadSummary() {
+    // Clock
+    updateDbClock()
+
+    // Weather forecast
+    try {
+      const ws = await fetch('/api/ha-state/weather.forecast_home').then(r => r.json())
+      const forecasts = ws.attributes?.forecast || []
+      const row = document.getElementById('db-weather-row')
+      if (forecasts.length) {
+        const todayStr = new Date().toDateString()
+        row.innerHTML = forecasts.slice(0, 10).map((f, i) => {
+          const d = new Date(f.datetime)
+          const dow = i === 0 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' })
+          const hi  = f.temperature != null ? Math.round(f.temperature) + '°' : '—'
+          const lo  = f.templow     != null ? Math.round(f.templow)     + '°' : ''
+          return `<div class="db-weather-day${i===0?' today':''}">
+            <div class="db-weather-dow">${dow}</div>
+            <div class="db-weather-icon">${weatherIcon(f.condition)}</div>
+            <div class="db-weather-hi">${hi}</div>
+            ${lo ? `<div class="db-weather-lo">${lo}</div>` : ''}
+          </div>`
+        }).join('')
+      } else {
+        row.innerHTML = '<div class="db-weather-loading">No forecast data</div>'
+      }
+    } catch { document.getElementById('db-weather-row').innerHTML = '<div class="db-weather-loading">Unavailable</div>' }
+
+    // Electricity price via HA template (automation.awtrix_electricity_price_monitor_2 attributes)
+    try {
+      const r = await fetch('/api/ha-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template: "{{ state_attr('automation.awtrix_electricity_price_monitor_2','current_price') | round(2) }} kr/kWh" })
+      })
+      document.getElementById('db-elec-price').textContent = r.ok ? await r.text() : '—'
+    } catch { document.getElementById('db-elec-price').textContent = '—' }
+
+    // Car charging plan
+    try {
+      const r = await fetch('/api/ha-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template: "{{ state_attr('sensor.charging_schedule','charging_summary') }}" })
+      })
+      document.getElementById('db-car-charge').textContent = r.ok ? (await r.text()).trim() || '—' : '—'
+    } catch { document.getElementById('db-car-charge').textContent = '—' }
   }
 
   function openDashboard() {
     if (dashboardOpen) return
     dashboardOpen = true
-    // Pause slideshow while dashboard is open
     if (!isPaused) {
       if (timer) { clearInterval(timer); timer = null }
       document.querySelectorAll('.slide video').forEach(v => v.pause())
       document.querySelectorAll('.slide .media-item img').forEach(img => { img.style.animationPlayState = 'paused' })
     }
+    dbSetScreen(0, false)
     dashboardEl.classList.remove('closing')
     dashboardEl.classList.add('open')
-    updateDbClock()
     dbClockTimer = setInterval(updateDbClock, 10000)
+    dbLoadSummary()
   }
 
   function closeDashboard() {
@@ -1600,11 +1747,9 @@
     dashboardEl.addEventListener('animationend', () => {
       dashboardEl.classList.remove('open','closing')
     }, { once: true })
-    // Resume slideshow
     if (!isPaused) resumeSlideshow()
   }
 
-  // Placeholder: called when a shortcut card is tapped
   function dbShortcut(action) {
     fetch('/api/dashboard/shortcut', {
       method: 'POST',
@@ -1755,16 +1900,21 @@
   document.addEventListener('mousemove', e => onGestureMove(e.clientX, e.clientY))
   document.addEventListener('dragstart', e => e.preventDefault())
 
-  // Swipe-up on dashboard → close
+  // Dashboard touch: swipe-up → close, swipe left/right → change screen
   let dbSwipeStart = null
   dashboardEl.addEventListener('touchstart', e => {
-    dbSwipeStart = { y: e.touches[0].clientY }
+    dbSwipeStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }
   }, { passive: true })
   dashboardEl.addEventListener('touchend', e => {
     if (!dbSwipeStart) return
+    const dx = e.changedTouches[0].clientX - dbSwipeStart.x
     const dy = e.changedTouches[0].clientY - dbSwipeStart.y
+    const adx = Math.abs(dx), ady = Math.abs(dy)
     dbSwipeStart = null
-    if (dy < -60) closeDashboard()
+    if (ady > 60 && ady > adx * 1.5 && dy < 0) { closeDashboard(); return }
+    if (adx > 50 && adx > ady * 1.5) {
+      if (dx < 0) dbNextScreen(); else dbPrevScreen()
+    }
   })
 
   // ── Init ──────────────────────────────────────────────────────────────────
@@ -1969,11 +2119,11 @@
         photos = photos.filter(p => p !== msg.filename)
         document.getElementById('empty').classList.toggle('visible', photos.length === 0)
       } else if (msg.type === 'remote-next') {
-        window.nextSlide()
-        if (isPaused) { isPaused = false; document.getElementById('settings-panel').classList.remove('paused') }
+        if (dashboardOpen) { dbNextScreen() }
+        else { window.nextSlide(); if (isPaused) { isPaused = false; document.getElementById('settings-panel').classList.remove('paused') } }
       } else if (msg.type === 'remote-prev') {
-        window.prevSlide()
-        if (isPaused) { isPaused = false; document.getElementById('settings-panel').classList.remove('paused') }
+        if (dashboardOpen) { dbPrevScreen() }
+        else { window.prevSlide(); if (isPaused) { isPaused = false; document.getElementById('settings-panel').classList.remove('paused') } }
       } else if (msg.type === 'remote-toggle-pause') {
         tapPause()
       } else if (msg.type === 'remote-settings') {
