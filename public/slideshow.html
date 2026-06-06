@@ -2693,6 +2693,10 @@ I did<!DOCTYPE html>
         const gl = document.createElementNS('http://www.w3.org/2000/svg','line')
         gl.setAttribute('x1','0'); gl.setAttribute('x2',W); gl.setAttribute('y1',yp.toFixed(1)); gl.setAttribute('y2',yp.toFixed(1))
         gl.setAttribute('stroke','#2a2a2a'); gl.setAttribute('stroke-width','1'); svg.appendChild(gl)
+        const lbl = document.createElementNS('http://www.w3.org/2000/svg','text')
+        lbl.setAttribute('x','2'); lbl.setAttribute('y',(yp - 2).toFixed(1))
+        lbl.setAttribute('fill','#444'); lbl.setAttribute('font-size','8')
+        lbl.textContent = y; svg.appendChild(lbl)
       }
       slots.forEach((s, i) => {
         const d = new Date(s.t); if (d.getMinutes() !== 0) return
