@@ -2129,20 +2129,24 @@
     if (!lxConfig) return
     const list = document.getElementById('lx-room-list')
     if (!list) return
-    list.innerHTML = lxConfig.rooms.map(room => {
+    list.innerHTML = lxConfig.rooms.map((room, idx) => {
       const total = room.lights.length
       const onCnt = lxRoomOnCount(room)
       const anyOn = onCnt > 0
       const status = total === 0 ? 'No lights' : onCnt === 0 ? 'All off' :
                      onCnt === total ? 'All on' : `${onCnt} of ${total} on`
-      const nameJson = JSON.stringify(room.name)
-      return `<div class="lx-room-card${anyOn ? ' lx-any-on' : ''}" onclick="lxOpenRoom(${nameJson})">
-        <div class="lx-room-icon">💡</div>
+      const icon = anyOn ? '💡' : '○'
+      return `<div class="lx-room-card${anyOn ? ' lx-any-on' : ''}" data-room-idx="${idx}">
+        <div class="lx-room-icon" style="font-size:${anyOn?'1.5rem':'1rem'};color:${anyOn?'inherit':'#444'}">${icon}</div>
         <div class="lx-room-name">${room.name}</div>
         <div class="lx-room-status${anyOn ? ' lx-some-on' : ''}">${status}</div>
         <div class="lx-room-chevron">›</div>
       </div>`
     }).join('')
+    list.onclick = e => {
+      const card = e.target.closest('[data-room-idx]')
+      if (card) lxOpenRoom(lxConfig.rooms[+card.dataset.roomIdx].name)
+    }
   }
 
   function lxLightCardHTML(light) {
