@@ -336,9 +336,9 @@ I did<!DOCTYPE html>
     padding: 12px 16px; display: flex; align-items: center; gap: 12px;
   }
   .sx-room-name { font-size: 0.9rem; font-weight: 500; color: #bbb; flex: 0 0 110px; }
-  .sx-sensors { display: flex; flex-wrap: wrap; gap: 4px 14px; flex: 1; }
-  .sx-chip { font-size: 0.85rem; color: #ddd; white-space: nowrap; }
-  .sx-chip-label { font-size: 0.75rem; color: #666; margin-right: 3px; }
+  .sx-sensors { display: flex; flex-wrap: wrap; gap: 4px 16px; flex: 1; }
+  .sx-chip { font-size: 0.9rem; font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+  .sx-chip svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.7; }
   .sx-loading { color: #444; font-size: 0.8rem; }
 
   /* ── Lights UI ──────────────────────────────────────────────────────────── */
@@ -2277,6 +2277,27 @@ I did<!DOCTYPE html>
     { name: 'Food cellar',     temp: 'sensor.zbeacon_th01_temperature',             humid: 'sensor.zbeacon_th01_humidity' },
   ]
 
+  const SX_ICON_THERMO = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 13V5A3 3 0 0 0 9 5v8a5 5 0 1 0 6 0M12 4a1 1 0 0 1 1 1v8.17A3 3 0 0 1 12 19a3 3 0 0 1-1-5.83V5a1 1 0 0 1 1-1z"/></svg>`
+  const SX_ICON_HUMID  = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c-5.33 4.55-8 8.48-8 11.8a8 8 0 0 0 16 0C20 10.48 17.33 6.55 12 2z"/></svg>`
+
+  function sxTempColor(v) {
+    if (isNaN(v)) return '#888'
+    if (v < 20)  return '#5b9bd5'  // blue — cold
+    if (v < 22)  return '#4caf50'  // green — comfortable
+    if (v < 24)  return '#ffc107'  // yellow — warm
+    if (v < 25)  return '#ff9800'  // orange — hot
+    return '#f44336'               // red — very hot
+  }
+
+  function sxHumidColor(v) {
+    if (isNaN(v)) return '#888'
+    if (v < 30)  return '#5b9bd5'  // blue — dry
+    if (v < 50)  return '#4caf50'  // green — ideal
+    if (v < 60)  return '#ffc107'  // yellow — slightly humid
+    if (v < 70)  return '#ff9800'  // orange — humid
+    return '#f44336'               // red — very humid
+  }
+
   async function dbLoadSensors() {
     const list = document.getElementById('sx-room-list')
     if (!list) return
@@ -2290,13 +2311,17 @@ I did<!DOCTYPE html>
     list.innerHTML = SX_ROOMS.map(room => {
       const t = stateMap[room.temp]
       const h = stateMap[room.humid]
-      const tv = t && t.state !== 'unavailable' && t.state !== 'unknown' ? parseFloat(t.state).toFixed(1) + '°C' : '—'
-      const hv = h && h.state !== 'unavailable' && h.state !== 'unknown' ? Math.round(parseFloat(h.state)) + '%' : '—'
+      const tRaw = t && t.state !== 'unavailable' && t.state !== 'unknown' ? parseFloat(t.state) : NaN
+      const hRaw = h && h.state !== 'unavailable' && h.state !== 'unknown' ? parseFloat(h.state) : NaN
+      const tv = isNaN(tRaw) ? '—' : tRaw.toFixed(1) + '°C'
+      const hv = isNaN(hRaw) ? '—' : Math.round(hRaw) + '%'
+      const tc = sxTempColor(tRaw)
+      const hc = sxHumidColor(hRaw)
       return `<div class="sx-room-card">
         <div class="sx-room-name">${room.name}</div>
         <div class="sx-sensors">
-          <div class="sx-chip">${tv}</div>
-          <div class="sx-chip"><span class="sx-chip-label">RH</span>${hv}</div>
+          <div class="sx-chip" style="color:${tc}">${SX_ICON_THERMO}${tv}</div>
+          <div class="sx-chip" style="color:${hc}">${SX_ICON_HUMID}${hv}</div>
         </div>
       </div>`
     }).join('')
