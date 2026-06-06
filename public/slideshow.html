@@ -1377,29 +1377,112 @@
     resumeSlideshow()
   })
 
-  // Long-press detection (500ms hold, cancel on >8px movement)
-  let pressTimer = null
-  let pressStart = { x: 0, y: 0 }
+  // ── Unified gesture handler ───────────────────────────────────────────────
+  // Long press (≥500ms, <8px movement) → open settings
+  // Short tap (<500ms, <10px movement) → pause/resume slideshow
+  // Swipe (>50px horizontal, more horizontal than vertical) → next/prev slide
 
-  function startPress(x, y) {
-    pressStart = { x, y }
-    pressTimer = setTimeout(() => { pressTimer = null; openSettings() }, 500)
+  let gestureStart = null          // { x, y, t } on press start
+  let longPressTimer = null        // fires after 500ms → open settings
+  let tapPauseAutoResume = null    // 30s auto-resume after tap-pause
+
+  function clearTapPauseAutoResume() {
+    if (tapPauseAutoResume) { clearTimeout(tapPauseAutoResume); tapPauseAutoResume = null }
   }
-  function cancelPress(x, y) {
-    if (!pressTimer) return
-    if (x !== undefined) {
-      const dx = x - pressStart.x, dy = y - pressStart.y
-      if (dx * dx + dy * dy < 64) return  // <8px — not a drag
+
+  function tapPause() {
+    if (!isPaused) {
+      // Pause slideshow
+      if (timer) { clearInterval(timer); timer = null }
+      document.querySelectorAll('.slide video').forEach(v => v.pause())
+      isPaused = true
+      const panel = document.getElementById('settings-panel')
+      if (panel) panel.classList.add('paused')
+      // Auto-resume after 30s of no interaction
+      clearTapPauseAutoResume()
+      tapPauseAutoResume = setTimeout(() => {
+        tapPauseAutoResume = null
+        if (isPaused) resumeSlideshow()
+      }, 30000)
+    } else {
+      // Resume slideshow
+      clearTapPauseAutoResume()
+      document.querySelectorAll('.slide video').forEach(v => v.play().catch(() => {}))
+      resumeSlideshow()
     }
-    clearTimeout(pressTimer); pressTimer = null
   }
 
-  document.addEventListener('mousedown',  e => { if (!overlay.classList.contains('open')) startPress(e.clientX, e.clientY) })
-  document.addEventListener('mouseup',    e => cancelPress(e.clientX, e.clientY))
-  document.addEventListener('mousemove',  e => cancelPress(e.clientX, e.clientY))
-  document.addEventListener('touchstart', e => { if (!overlay.classList.contains('open')) startPress(e.touches[0].clientX, e.touches[0].clientY) }, { passive: true })
-  document.addEventListener('touchend',   () => cancelPress())
-  document.addEventListener('touchmove',  e => cancelPress(e.touches[0].clientX, e.touches[0].clientY), { passive: true })
+  function onGestureStart(x, y) {
+    if (overlay.classList.contains('open')) return
+    gestureStart = { x, y, t: Date.now() }
+    longPressTimer = setTimeout(() => {
+      longPressTimer = null
+      gestureStart = null
+      openSettings()
+    }, 500)
+  }
+
+  function onGestureEnd(x, y) {
+    if (!gestureStart) return
+    const dx = x - gestureStart.x
+    const dy = y - gestureStart.y
+    const dt = Date.now() - gestureStart.t
+    const absDx = Math.abs(dx), absDy = Math.abs(dy)
+
+    // Always cancel long-press timer on release (short interaction)
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null }
+    gestureStart = null
+
+    // Swipe: horizontal movement >50px, more horizontal than vertical
+    if (absDx > 50 && absDx > absDy * 1.5) {
+      clearTapPauseAutoResume()
+      if (dx < 0) {
+        window.nextSlide()   // swipe left → next
+      } else {
+        window.prevSlide()   // swipe right → previous
+      }
+      // Swiping resumes the slideshow (nextSlide/prevSlide call startTimer)
+      if (isPaused) {
+        isPaused = false
+        const panel = document.getElementById('settings-panel')
+        if (panel) panel.classList.remove('paused')
+      }
+      return
+    }
+
+    // Short tap: <500ms, minimal movement → pause/resume
+    if (dt < 500 && absDx < 10 && absDy < 10) {
+      tapPause()
+      return
+    }
+    // Long press was already handled by the timer callback
+  }
+
+  function onGestureMove(x, y) {
+    if (!gestureStart || !longPressTimer) return
+    const dx = x - gestureStart.x, dy = y - gestureStart.y
+    // Cancel long-press if moved more than 8px
+    if (dx * dx + dy * dy > 64) {
+      clearTimeout(longPressTimer); longPressTimer = null
+    }
+  }
+
+  // Mouse events
+  document.addEventListener('mousedown', e => onGestureStart(e.clientX, e.clientY))
+  document.addEventListener('mouseup',   e => onGestureEnd(e.clientX, e.clientY))
+  document.addEventListener('mousemove', e => onGestureMove(e.clientX, e.clientY))
+
+  // Touch events
+  document.addEventListener('touchstart', e => {
+    onGestureStart(e.touches[0].clientX, e.touches[0].clientY)
+  }, { passive: true })
+  document.addEventListener('touchend', e => {
+    const t = e.changedTouches[0]
+    onGestureEnd(t.clientX, t.clientY)
+  })
+  document.addEventListener('touchmove', e => {
+    onGestureMove(e.touches[0].clientX, e.touches[0].clientY)
+  }, { passive: true })
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
