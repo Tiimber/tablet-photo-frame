@@ -191,18 +191,24 @@ I did<!DOCTYPE html>
     position: absolute; top: 14px; right: 18px;
     background: none; border: none;
     color: #555; font-size: 1.8rem; cursor: pointer; line-height: 1; z-index: 10;
+    padding: 10px; min-width: 44px; min-height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: auto; -webkit-tap-highlight-color: transparent;
   }
   #dashboard-close:hover { color: #ccc; }
 
   #dashboard-swipe-hint {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-    width: 40px; height: 4px; background: #444; border-radius: 2px; z-index: 10;
+    display: flex; justify-content: center; padding: 8px 0 4px; flex-shrink: 0; z-index: 10;
+  }
+  #dashboard-swipe-hint::after {
+    content: ''; display: block;
+    width: 40px; height: 4px; background: #444; border-radius: 2px;
   }
 
   /* Dots */
   #db-dots {
     display: flex; gap: 8px; justify-content: center;
-    padding: 28px 0 8px; flex-shrink: 0; z-index: 10;
+    padding: 8px 0 8px; flex-shrink: 0; z-index: 10;
   }
   .db-dot {
     width: 7px; height: 7px; border-radius: 50%;
@@ -874,7 +880,6 @@ I did<!DOCTYPE html>
 
 <!-- Dashboard overlay (swipe-down) -->
 <div id="dashboard-overlay">
-  <div id="dashboard-swipe-hint"></div>
   <button id="dashboard-close" onclick="closeDashboard()">✕</button>
 
   <!-- Screen indicator dots -->
@@ -884,6 +889,7 @@ I did<!DOCTYPE html>
     <span class="db-dot" data-screen="2"></span>
     <span class="db-dot" data-screen="3"></span>
   </div>
+  <div id="dashboard-swipe-hint"></div>
 
   <!-- Carousel viewport -->
   <div id="db-viewport">
@@ -3050,21 +3056,33 @@ I did<!DOCTYPE html>
   document.addEventListener('mousemove', e => onGestureMove(e.clientX, e.clientY))
   document.addEventListener('dragstart', e => e.preventDefault())
 
-  // Dashboard touch: swipe-up → close, swipe left/right → change screen
+  // Dashboard touch+mouse: swipe-up → close, swipe left/right → change screen
   let dbSwipeStart = null
-  dashboardEl.addEventListener('touchstart', e => {
-    dbSwipeStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-  }, { passive: true })
-  dashboardEl.addEventListener('touchend', e => {
+  function dbGestureStart(x, y) { dbSwipeStart = { x, y } }
+  function dbGestureEnd(x, y) {
     if (!dbSwipeStart) return
-    const dx = e.changedTouches[0].clientX - dbSwipeStart.x
-    const dy = e.changedTouches[0].clientY - dbSwipeStart.y
+    const dx = x - dbSwipeStart.x
+    const dy = y - dbSwipeStart.y
     const adx = Math.abs(dx), ady = Math.abs(dy)
     dbSwipeStart = null
     if (ady > 60 && ady > adx * 1.5 && dy < 0) { closeDashboard(); return }
     if (adx > 50 && adx > ady * 1.5) {
       if (dx < 0) dbNextScreen(); else dbPrevScreen()
     }
+  }
+  dashboardEl.addEventListener('touchstart', e => {
+    dbGestureStart(e.touches[0].clientX, e.touches[0].clientY)
+  }, { passive: true })
+  dashboardEl.addEventListener('touchend', e => {
+    dbGestureEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY)
+  })
+  dashboardEl.addEventListener('mousedown', e => {
+    if (Date.now() - lastTouchEnd < 600) return
+    dbGestureStart(e.clientX, e.clientY)
+  })
+  dashboardEl.addEventListener('mouseup', e => {
+    if (Date.now() - lastTouchEnd < 600) return
+    dbGestureEnd(e.clientX, e.clientY)
   })
 
   // ── Init ──────────────────────────────────────────────────────────────────
