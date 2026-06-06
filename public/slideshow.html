@@ -2268,6 +2268,7 @@ I did<!DOCTYPE html>
   const SX_ROOMS = [
     { name: 'Living room',     temp: 'sensor.tz3000_rdhukkmi_ts0201_temperature_3', humid: 'sensor.tz3000_rdhukkmi_ts0201_humidity_3',
       extras: [
+        { type: 'climate', entity: 'climate.qlima_webber_wms',                  label: 'AC' },
         { type: 'fan',     entity: 'fan.ikea_of_sweden_starkvind_air_purifier', label: 'Air purifier' },
         { type: 'vacuum',  entity: 'vacuum.downstairs_vacuum',                  label: 'Vacuum' },
       ]
@@ -2352,6 +2353,14 @@ I did<!DOCTYPE html>
     </div>`
   }
 
+  function sxRenderClimate(label, d) {
+    if (!d) return `<div class="sx-extra-row"><span class="sx-extra-label">${label}:</span> <span class="sx-extra-val">—</span></div>`
+    const mode   = d.state === 'off' ? 'Off' : (d.state.charAt(0).toUpperCase() + d.state.slice(1).replace(/_/g,' '))
+    const target = d.attributes?.temperature != null ? ` · ${d.attributes.temperature}°C` : ''
+    const val    = d.state === 'off' ? 'Off' : `${mode}${target}`
+    return `<div class="sx-extra-row"><span class="sx-extra-label">${label}:</span> <span class="sx-extra-val">${val}</span></div>`
+  }
+
   function sxRenderLawnMower(label, d) {
     if (!d) return `<div class="sx-extra-row"><span class="sx-extra-label">${label}:</span> <span class="sx-extra-val">—</span></div>`
     const a = d.attributes || {}
@@ -2366,6 +2375,7 @@ I did<!DOCTYPE html>
     if (ex.type === 'fan')        return sxRenderFan(ex.label, d)
     if (ex.type === 'vacuum')     return sxRenderVacuum(ex.label, d)
     if (ex.type === 'lawn_mower') return sxRenderLawnMower(ex.label, d)
+    if (ex.type === 'climate')    return sxRenderClimate(ex.label, d)
     // generic fallback
     const val = d ? d.state : '—'
     return `<div class="sx-extra-row"><span class="sx-extra-label">${ex.label}:</span> <span class="sx-extra-val">${val}</span></div>`
