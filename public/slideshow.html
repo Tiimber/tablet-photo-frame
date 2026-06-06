@@ -198,11 +198,8 @@ I did<!DOCTYPE html>
   #dashboard-close:hover { color: #ccc; }
 
   #dashboard-swipe-hint {
-    display: flex; justify-content: center; padding: 8px 0 4px; flex-shrink: 0; z-index: 10;
-  }
-  #dashboard-swipe-hint::after {
-    content: ''; display: block;
-    width: 40px; height: 4px; background: #444; border-radius: 2px;
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 4px; background: #444; border-radius: 2px; z-index: 10;
   }
 
   /* Dots */
