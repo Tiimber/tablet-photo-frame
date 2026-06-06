@@ -329,6 +329,18 @@ I did<!DOCTYPE html>
     text-align: center; line-height: 1.4;
   }
 
+  /* ── Sensors UI ─────────────────────────────────────────────────────────── */
+  #sx-room-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; }
+  .sx-room-card {
+    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
+    padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+  }
+  .sx-room-name { font-size: 0.9rem; font-weight: 500; color: #bbb; flex: 0 0 110px; }
+  .sx-sensors { display: flex; flex-wrap: wrap; gap: 4px 14px; flex: 1; }
+  .sx-chip { font-size: 0.85rem; color: #ddd; white-space: nowrap; }
+  .sx-chip-label { font-size: 0.75rem; color: #666; margin-right: 3px; }
+  .sx-loading { color: #444; font-size: 0.8rem; }
+
   /* ── Lights UI ──────────────────────────────────────────────────────────── */
   #lx-rooms-view { display: flex; flex-direction: column; gap: 10px; }
   .lx-room-card {
@@ -823,7 +835,7 @@ I did<!DOCTYPE html>
       <!-- ── Screen 3: Sensors ─────────────────────────────────────── -->
       <div class="db-screen" id="db-screen-3">
         <div class="db-screen-title">Sensors</div>
-        <div class="db-placeholder">📡<br>Coming soon</div>
+        <div id="sx-room-list"></div>
       </div>
 
     </div><!-- /db-track -->
@@ -2247,14 +2259,57 @@ I did<!DOCTYPE html>
   window.lxOpenRoom     = lxOpenRoom
   window.lxBack         = lxBack
 
+  // ── Sensors screen ───────────────────────────────────────────────────────
+  const SX_ROOMS = [
+    { name: 'Living room',     temp: 'sensor.tz3000_rdhukkmi_ts0201_temperature_3', humid: 'sensor.tz3000_rdhukkmi_ts0201_humidity_3' },
+    { name: 'Kitchen',         temp: 'sensor.zbeacon_th01_temperature_3',           humid: 'sensor.zbeacon_th01_humidity_3' },
+    { name: 'Bedroom',         temp: 'sensor.sensor_12_temperature',                humid: 'sensor.sensor_12_humidity' },
+    { name: 'Entrance',        temp: 'sensor.sensor_11_temperature',                humid: 'sensor.sensor_11_humidity' },
+    { name: 'Back entrance',   temp: 'sensor.back_hallway_t_h_sensor_temperature',  humid: 'sensor.back_hallway_t_h_sensor_humidity' },
+    { name: 'Walk-in closet',  temp: 'sensor.zbeacon_th01_temperature_2',           humid: 'sensor.zbeacon_th01_humidity_2' },
+    { name: 'Bathroom',        temp: 'sensor.tz3000_rdhukkmi_ts0201_temperature',   humid: 'sensor.tz3000_rdhukkmi_ts0201_humidity' },
+    { name: 'Laundry room',    temp: 'sensor.sensor_9_temperature',                 humid: 'sensor.sensor_9_humidity' },
+    { name: 'Exercise room',   temp: 'sensor.sensor_8_temperature',                 humid: 'sensor.sensor_8_humidity' },
+    { name: 'Play room',       temp: 'sensor.sensor_7_temperature',                 humid: 'sensor.sensor_7_humidity' },
+    { name: 'Upstairs lobby',  temp: 'sensor.sensor_10_temperature',                humid: 'sensor.sensor_10_humidity' },
+    { name: 'Game room',       temp: 'sensor.tz3000_rdhukkmi_ts0201_temperature_2', humid: 'sensor.tz3000_rdhukkmi_ts0201_humidity_2' },
+    { name: 'Garage',          temp: 'sensor.sensor_13_temperature',                humid: 'sensor.sensor_13_humidity' },
+    { name: 'Food cellar',     temp: 'sensor.zbeacon_th01_temperature',             humid: 'sensor.zbeacon_th01_humidity' },
+  ]
+
+  async function dbLoadSensors() {
+    const list = document.getElementById('sx-room-list')
+    if (!list) return
+    list.innerHTML = '<div class="sx-loading">Loading…</div>'
+    const allIds = SX_ROOMS.flatMap(r => [r.temp, r.humid])
+    let stateMap = {}
+    try {
+      const results = await Promise.all(allIds.map(id => fetch('/api/ha-state/' + id).then(r => r.json()).catch(() => null)))
+      allIds.forEach((id, i) => { stateMap[id] = results[i] })
+    } catch(e) {}
+    list.innerHTML = SX_ROOMS.map(room => {
+      const t = stateMap[room.temp]
+      const h = stateMap[room.humid]
+      const tv = t && t.state !== 'unavailable' && t.state !== 'unknown' ? parseFloat(t.state).toFixed(1) + '°C' : '—'
+      const hv = h && h.state !== 'unavailable' && h.state !== 'unknown' ? Math.round(parseFloat(h.state)) + '%' : '—'
+      return `<div class="sx-room-card">
+        <div class="sx-room-name">${room.name}</div>
+        <div class="sx-sensors">
+          <div class="sx-chip">${tv}</div>
+          <div class="sx-chip"><span class="sx-chip-label">RH</span>${hv}</div>
+        </div>
+      </div>`
+    }).join('')
+  }
+
   // Patch dbSetScreen to load lights when navigating to screen 2
   ;(function() {
     const orig = dbSetScreen
     dbSetScreen = function(n, animate) {
       orig(n, animate)
-      if (((n % DB_SCREENS) + DB_SCREENS) % DB_SCREENS === 2) {
-        lxInit().then(() => lxRenderRooms())
-      }
+      const s = ((n % DB_SCREENS) + DB_SCREENS) % DB_SCREENS
+      if (s === 2) lxInit().then(() => lxRenderRooms())
+      if (s === 3) dbLoadSensors()
     }
     window.dbNextScreen = () => dbSetScreen(dbScreen + 1)
     window.dbPrevScreen = () => dbSetScreen(dbScreen - 1)
