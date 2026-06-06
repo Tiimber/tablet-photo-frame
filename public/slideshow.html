@@ -250,6 +250,7 @@
   .db-info-label { font-size: 0.72rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
   .db-info-value { font-size: 1.4rem; font-weight: 600; color: #ddd; line-height: 1.2; }
   .db-info-value-sm { font-size: 0.88rem; font-weight: 400; color: #bbb; line-height: 1.4; }
+  .db-info-value-sm strong { color: #ddd; font-weight: 600; }
   .db-info-sub  { font-size: 0.78rem; color: #555; }
 
   /* Section label */
@@ -1922,7 +1923,13 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ template: "{{ state_attr('sensor.charging_schedule','charging_summary') }}" })
       })
-      document.getElementById('db-car-charge').textContent = r.ok ? (await r.text()).trim() || '—' : '—'
+      const md = r.ok ? (await r.text()).trim() : ''
+      const html = md ? md
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+        .replace(/\n{2,}/g,'<br><br>').replace(/\n/g,'<br>')
+        : '—'
+      document.getElementById('db-car-charge').innerHTML = html
     } catch { document.getElementById('db-car-charge').textContent = '—' }
   }
 
