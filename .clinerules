@@ -6,6 +6,7 @@
 - Prod Server: root@192.168.68.50 (Key auth, directory: /opt/slideshow)
 - Process Manager: PM2 (App name: slideshow)
 - Deploy Command: git push && ssh root@192.168.68.50 'cd /opt/slideshow && git pull origin main && pm2 restart slideshow'
+- Deploy Rule: Always run the Deploy Command automatically after committing any code change, without waiting to be asked.
 - Git Rule: Prod branch has no upstream tracking. Always use explicit 'git pull origin main'.
 
 ## Gitignored Runtime Files (Exist on server only)

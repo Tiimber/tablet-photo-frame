@@ -527,8 +527,31 @@ app.post('/api/remote/dashboard', (req, res) => {
 app.post('/api/dashboard/shortcut', express.json(), (req, res) => {
   const { action } = req.body || {}
   console.log('[dashboard] shortcut:', action)
-  // TODO: forward to HA service call based on action
   res.json({ ok: true, action })
+})
+
+// ── Lights config ─────────────────────────────────────────────────────────────
+const LIGHTS_FILE = path.join(__dirname, 'lights.json')
+app.get('/api/lights/config', (req, res) => {
+  try { res.json(JSON.parse(fs.readFileSync(LIGHTS_FILE, 'utf8'))) }
+  catch { res.json({ rooms: [] }) }
+})
+
+// ── HA service proxy ──────────────────────────────────────────────────────────
+app.post('/api/ha-service', express.json(), async (req, res) => {
+  const ha = loadHASync()
+  if (!ha || !ha.url || !ha.token) return res.status(503).json({ error: 'HA not configured' })
+  const { domain, service, data } = req.body || {}
+  if (!domain || !service) return res.status(400).json({ error: 'domain and service required' })
+  try {
+    const r = await fetch(`${ha.url.replace(/\/$/,'')}/api/services/${domain}/${service}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + ha.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(data || {})
+    })
+    if (!r.ok) return res.status(r.status).json({ error: 'HA error' })
+    res.json({ ok: true })
+  } catch(e) { res.status(502).json({ error: String(e) }) }
 })
 
 // Queue status endpoint — polled by manage.html as fallback

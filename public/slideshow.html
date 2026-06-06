@@ -329,6 +329,71 @@
     text-align: center; line-height: 1.4;
   }
 
+  /* ── Lights UI ──────────────────────────────────────────────────────────── */
+  #lx-rooms-view { display: flex; flex-direction: column; gap: 10px; }
+  .lx-room-card {
+    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
+    padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+    cursor: pointer; transition: background 0.15s, border-color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lx-room-card:active { background: #252525; }
+  .lx-room-card.lx-any-on { border-color: #7a5a20; }
+  .lx-room-icon { font-size: 1.5rem; line-height: 1; flex-shrink: 0; }
+  .lx-room-name { font-size: 1rem; font-weight: 500; color: #ddd; flex: 1; }
+  .lx-room-status { font-size: 0.75rem; color: #555; white-space: nowrap; }
+  .lx-room-status.lx-some-on { color: #c8922a; }
+  .lx-room-chevron { color: #444; font-size: 1rem; flex-shrink: 0; }
+
+  .lx-light-card {
+    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+    flex-shrink: 0;
+  }
+  .lx-light-card.lx-on { border-color: #7a5a20; background: #1e1a10; }
+  .lx-light-header {
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lx-light-name { font-size: 0.95rem; font-weight: 500; color: #ccc; flex: 1; }
+  .lx-toggle {
+    width: 44px; height: 26px; border-radius: 13px; border: none;
+    background: #333; position: relative; cursor: pointer; flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .lx-toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px; border-radius: 50%; background: #666;
+    transition: transform 0.2s, background 0.2s;
+  }
+  .lx-toggle.lx-on { background: #c8922a; }
+  .lx-toggle.lx-on::after { transform: translateX(18px); background: #fff; }
+
+  .lx-sliders { display: flex; flex-direction: column; gap: 8px; }
+  .lx-slider-row { display: flex; align-items: center; gap: 8px; }
+  .lx-slider-label { font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; width: 28px; flex-shrink: 0; }
+  .lx-slider {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; border-radius: 2px; outline: none; cursor: pointer;
+    background: #333;
+  }
+  .lx-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+    background: #c8922a; cursor: pointer; border: none;
+  }
+  .lx-slider::-moz-range-thumb {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #c8922a; cursor: pointer; border: none;
+  }
+  .lx-slider-val { font-size: 0.7rem; color: #666; width: 28px; text-align: right; flex-shrink: 0; }
+
+  .lx-all-card {
+    background: #141414; border: 1px solid #333; border-radius: 14px;
+    padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+  }
+  .lx-all-label { font-size: 0.85rem; color: #888; flex: 1; font-style: italic; }
+
   /* Shortcut card */
   .db-shortcut { cursor: pointer; transition: background 0.15s; align-items: center; }
   .db-shortcut:active { background: #252525; }
@@ -738,8 +803,20 @@
 
       <!-- ── Screen 2: Lights ──────────────────────────────────────── -->
       <div class="db-screen" id="db-screen-2">
-        <div class="db-screen-title">Lights</div>
-        <div class="db-placeholder">💡<br>Coming soon</div>
+        <!-- Level 1: room list -->
+        <div id="lx-rooms-view">
+          <div class="db-screen-title">Lights</div>
+          <div id="lx-room-list"></div>
+        </div>
+        <!-- Level 2: room detail (hidden until drill-down) -->
+        <div id="lx-detail-view" style="display:none; flex-direction:column; height:100%; gap:12px;">
+          <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+            <button id="lx-back-btn" onclick="lxBack()" style="background:none;border:none;color:#888;font-size:1.5rem;cursor:pointer;padding:0 4px 0 0;line-height:1;">‹</button>
+            <div class="db-screen-title" id="lx-detail-title" style="margin:0;padding:0;"></div>
+            <button id="lx-detail-close" onclick="closeDashboard()" style="background:none;border:none;color:#555;font-size:1.4rem;cursor:pointer;margin-left:auto;line-height:1;">✕</button>
+          </div>
+          <div id="lx-light-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
       </div>
 
       <!-- ── Screen 3: Sensors ─────────────────────────────────────── -->
@@ -1974,6 +2051,216 @@
 
   window.openDashboard  = openDashboard
   window.closeDashboard = closeDashboard
+
+  // ── Lights UI ────────────────────────────────────────────────────────────
+  let lxConfig    = null
+  let lxStates    = {}
+  let lxRoom      = null
+  let lxPollTimer = null
+
+  async function lxInit() {
+    if (lxConfig) return
+    try { const r = await fetch('/api/lights/config'); lxConfig = await r.json() }
+    catch { lxConfig = { rooms: [] } }
+  }
+
+  async function lxFetchStates(entities) {
+    const results = await Promise.allSettled(
+      entities.map(e => fetch('/api/ha-state/' + e).then(r => r.json()))
+    )
+    entities.forEach((e, i) => {
+      if (results[i].status === 'fulfilled') lxStates[e] = results[i].value
+    })
+  }
+
+  const lxIsOn    = id => { const s = lxStates[id]; return s && s.state === 'on' }
+  const lxIsSwitch = id => id.startsWith('switch.')
+
+  function lxBrightnessPct(id) {
+    const b = lxStates[id]?.attributes?.brightness
+    return b != null ? Math.round(b / 255 * 100) : null
+  }
+  function lxColorTemp(id)      { return lxStates[id]?.attributes?.color_temp ?? null }
+  function lxColorTempRange(id) {
+    const a = lxStates[id]?.attributes || {}
+    return { min: a.min_mireds ?? 153, max: a.max_mireds ?? 500 }
+  }
+  function lxSupportsColorTemp(id) {
+    const modes = lxStates[id]?.attributes?.supported_color_modes || []
+    return modes.some(m => ['color_temp','xy','hs','rgb','rgbw','rgbww'].includes(m))
+  }
+
+  async function lxCallService(domain, service, data) {
+    await fetch('/api/ha-service', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain, service, data })
+    }).catch(() => {})
+  }
+
+  async function lxToggle(entity_id, forceOn) {
+    const domain  = lxIsSwitch(entity_id) ? 'switch' : 'light'
+    const on      = forceOn !== undefined ? forceOn : !lxIsOn(entity_id)
+    if (lxStates[entity_id]) lxStates[entity_id].state = on ? 'on' : 'off'
+    lxRenderDetail(); lxRenderRooms()
+    await lxCallService(domain, on ? 'turn_on' : 'turn_off', { entity_id })
+  }
+
+  async function lxSetBrightness(entity_id, pct) {
+    const brightness = Math.round(pct / 100 * 255)
+    if (lxStates[entity_id]) {
+      lxStates[entity_id].state = 'on'
+      lxStates[entity_id].attributes = lxStates[entity_id].attributes || {}
+      lxStates[entity_id].attributes.brightness = brightness
+    }
+    await lxCallService('light', 'turn_on', { entity_id, brightness })
+  }
+
+  async function lxSetColorTemp(entity_id, mireds) {
+    if (lxStates[entity_id]) {
+      lxStates[entity_id].attributes = lxStates[entity_id].attributes || {}
+      lxStates[entity_id].attributes.color_temp = mireds
+    }
+    await lxCallService('light', 'turn_on', { entity_id, color_temp: mireds })
+  }
+
+  function lxRoomOnCount(room) { return room.lights.filter(l => lxIsOn(l.entity_id)).length }
+
+  function lxRenderRooms() {
+    if (!lxConfig) return
+    const list = document.getElementById('lx-room-list')
+    if (!list) return
+    list.innerHTML = lxConfig.rooms.map(room => {
+      const total = room.lights.length
+      const onCnt = lxRoomOnCount(room)
+      const anyOn = onCnt > 0
+      const status = total === 0 ? 'No lights' : onCnt === 0 ? 'All off' :
+                     onCnt === total ? 'All on' : `${onCnt} of ${total} on`
+      const nameJson = JSON.stringify(room.name)
+      return `<div class="lx-room-card${anyOn ? ' lx-any-on' : ''}" onclick="lxOpenRoom(${nameJson})">
+        <div class="lx-room-icon">💡</div>
+        <div class="lx-room-name">${room.name}</div>
+        <div class="lx-room-status${anyOn ? ' lx-some-on' : ''}">${status}</div>
+        <div class="lx-room-chevron">›</div>
+      </div>`
+    }).join('')
+  }
+
+  function lxLightCardHTML(light) {
+    const { entity_id: id, name } = light
+    const on  = lxIsOn(id)
+    const sw  = lxIsSwitch(id)
+    const eid = id.replace(/\./g, '_')
+    const bPct = lxBrightnessPct(id)
+    const ct   = lxColorTemp(id)
+    const ctr  = lxColorTempRange(id)
+    const hasCT = !sw && lxSupportsColorTemp(id)
+    let sliders = ''
+    if (!sw && on) {
+      sliders = '<div class="lx-sliders">'
+      if (bPct !== null) {
+        sliders += `<div class="lx-slider-row">
+          <div class="lx-slider-label">Bri</div>
+          <input type="range" class="lx-slider" min="1" max="100" value="${bPct}"
+            oninput="this.nextElementSibling.textContent=this.value+'%'"
+            onchange="lxSetBrightness('${id}',+this.value)">
+          <div class="lx-slider-val">${bPct}%</div></div>`
+      }
+      if (hasCT && ct !== null) {
+        sliders += `<div class="lx-slider-row">
+          <div class="lx-slider-label">Temp</div>
+          <input type="range" class="lx-slider" min="${ctr.min}" max="${ctr.max}" value="${ct}"
+            oninput="this.nextElementSibling.textContent=this.value"
+            onchange="lxSetColorTemp('${id}',+this.value)">
+          <div class="lx-slider-val">${ct}</div></div>`
+      }
+      sliders += '</div>'
+    }
+    return `<div class="lx-light-card${on ? ' lx-on' : ''}">
+      <div class="lx-light-header" onclick="lxToggle('${id}')">
+        <div class="lx-light-name">${name}</div>
+        <button class="lx-toggle${on ? ' lx-on' : ''}" onclick="event.stopPropagation();lxToggle('${id}')"></button>
+      </div>${sliders}</div>`
+  }
+
+  function lxRenderDetail() {
+    if (!lxRoom) return
+    const list = document.getElementById('lx-light-list')
+    if (!list) return
+    const lights = lxRoom.lights
+    let html = ''
+    if (lights.length > 1) {
+      const allOn = lxRoomOnCount(lxRoom) === lights.length
+      html += `<div class="lx-all-card">
+        <div class="lx-all-label">All lights</div>
+        <button class="lx-toggle${allOn ? ' lx-on' : ''}" onclick="lxToggleAll(${!allOn})"></button>
+      </div>`
+    }
+    html += lights.map(lxLightCardHTML).join('')
+    list.innerHTML = html
+  }
+
+  async function lxToggleAll(forceOn) {
+    if (!lxRoom) return
+    for (const l of lxRoom.lights) await lxToggle(l.entity_id, forceOn)
+  }
+
+  async function lxOpenRoom(name) {
+    if (!lxConfig) return
+    lxRoom = lxConfig.rooms.find(r => r.name === name)
+    if (!lxRoom) return
+    document.getElementById('lx-detail-title').textContent = name
+    document.getElementById('lx-rooms-view').style.display = 'none'
+    const dv = document.getElementById('lx-detail-view')
+    dv.style.display = 'flex'
+    document.getElementById('lx-light-list').innerHTML =
+      '<div style="color:#444;font-size:0.85rem;padding:8px 0">Loading…</div>'
+    await lxFetchStates(lxRoom.lights.map(l => l.entity_id))
+    lxRenderDetail()
+    clearInterval(lxPollTimer)
+    lxPollTimer = setInterval(async () => {
+      if (!lxRoom) return
+      await lxFetchStates(lxRoom.lights.map(l => l.entity_id))
+      lxRenderDetail()
+    }, 10000)
+  }
+
+  function lxBack() {
+    lxRoom = null
+    clearInterval(lxPollTimer); lxPollTimer = null
+    document.getElementById('lx-detail-view').style.display = 'none'
+    document.getElementById('lx-rooms-view').style.display  = ''
+  }
+
+  window.lxToggle       = lxToggle
+  window.lxToggleAll    = lxToggleAll
+  window.lxSetBrightness = lxSetBrightness
+  window.lxSetColorTemp  = lxSetColorTemp
+  window.lxOpenRoom     = lxOpenRoom
+  window.lxBack         = lxBack
+
+  // Patch dbSetScreen to load lights when navigating to screen 2
+  ;(function() {
+    const orig = dbSetScreen
+    dbSetScreen = function(n, animate) {
+      orig(n, animate)
+      if (((n % DB_SCREENS) + DB_SCREENS) % DB_SCREENS === 2) {
+        lxInit().then(() => lxRenderRooms())
+      }
+    }
+    window.dbNextScreen = () => dbSetScreen(dbScreen + 1)
+    window.dbPrevScreen = () => dbSetScreen(dbScreen - 1)
+  })()
+
+  // remote-dashboard while in room detail → go back to room list instead of closing
+  ;(function() {
+    const origClose = closeDashboard
+    closeDashboard = function() {
+      if (lxRoom) { lxBack(); return }
+      clearInterval(lxPollTimer); lxPollTimer = null
+      origClose()
+    }
+    window.closeDashboard = closeDashboard
+  })()
 
   // ── Unified gesture handler ───────────────────────────────────────────────
   // Long press (≥500ms, <8px movement) → open settings

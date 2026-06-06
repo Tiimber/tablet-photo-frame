@@ -1,0 +1,92 @@
+{
+  "rooms": [
+    {
+      "name": "Living room",
+      "lights": [
+        { "entity_id": "light.computer_lights", "name": "Computer" },
+        { "entity_id": "light.massage_chair_lights", "name": "Massage Chair" }
+      ]
+    },
+    {
+      "name": "Kitchen",
+      "lights": [
+        { "entity_id": "light.kitchen_table_light", "name": "Table" },
+        { "entity_id": "light.kitchen_ceiling_lights", "name": "Ceiling" }
+      ]
+    },
+    {
+      "name": "Bedroom",
+      "lights": [
+        { "entity_id": "light.bedroom_lights", "name": "Lights" }
+      ]
+    },
+    {
+      "name": "Entrance",
+      "lights": [
+        { "entity_id": "light.hallway_lights", "name": "Front" },
+        { "entity_id": "light.back_hallway_light", "name": "Back" }
+      ]
+    },
+    {
+      "name": "Walk in closet",
+      "lights": [
+        { "entity_id": "light.walk_in_closet_light", "name": "Lights" }
+      ]
+    },
+    {
+      "name": "Bathroom",
+      "lights": [
+        { "entity_id": "light.spotlights", "name": "Lights" }
+      ]
+    },
+    {
+      "name": "Laundry room",
+      "lights": [
+        { "entity_id": "light.laundry_room_lights", "name": "Lights" }
+      ]
+    },
+    {
+      "name": "Exercise room",
+      "lights": [
+        { "entity_id": "light.excercise_room_light", "name": "Lights" }
+      ]
+    },
+    {
+      "name": "Play room",
+      "lights": [
+        { "entity_id": "light.play_room_lights", "name": "Lights" }
+      ]
+    },
+    {
+      "name": "Stairway",
+      "lights": [
+        { "entity_id": "light.stairs_light_lower", "name": "Lower" },
+        { "entity_id": "light.stairs_light_upper", "name": "Upper" }
+      ]
+    },
+    {
+      "name": "Upstairs lobby",
+      "lights": [
+        { "entity_id": "light.upstairs_lobby", "name": "LED Lights" }
+      ]
+    },
+    {
+      "name": "Game room",
+      "lights": [
+        { "entity_id": "light.game_room_lights", "name": "LED Lights" }
+      ]
+    },
+    {
+      "name": "Garage",
+      "lights": [
+        { "entity_id": "switch.garage_lights_socket", "name": "Lights" }
+      ]
+    },
+    {
+      "name": "Outdoors",
+      "lights": [
+        { "entity_id": "light.entrance_lights", "name": "Entrance" }
+      ]
+    }
+  ]
+}

@@ -20,6 +20,7 @@ pids/
 ha_sync.json
 config.json
 server.config.json
+lights.json
 
 # Metadata
 meta.json
