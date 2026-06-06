@@ -1646,7 +1646,7 @@
   let dbClockTimer   = null
 
   function dbSetScreen(n, animate = true) {
-    n = Math.max(0, Math.min(DB_SCREENS - 1, n))
+    n = ((n % DB_SCREENS) + DB_SCREENS) % DB_SCREENS
     dbScreen = n
     dbTrack.style.transition = animate ? 'transform 0.32s cubic-bezier(0.4,0,0.2,1)' : 'none'
     dbTrack.style.transform  = `translateX(${-n * 100}vw)`
@@ -2132,7 +2132,8 @@
       } else if (msg.type === 'remote-toggle-pause') {
         tapPause()
       } else if (msg.type === 'remote-settings') {
-        if (!overlay.classList.contains('open')) openSettings()
+        if (dashboardOpen) { closeDashboard() }
+        else if (!overlay.classList.contains('open')) openSettings()
         else { closeSettings(); if (!isPaused) resumeSlideshow() }
       } else if (msg.type === 'remote-dashboard') {
         if (dashboardOpen) closeDashboard()
