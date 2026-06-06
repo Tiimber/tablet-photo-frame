@@ -331,6 +331,10 @@ I did<!DOCTYPE html>
 
   /* ── Sensors UI ─────────────────────────────────────────────────────────── */
   #sx-room-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; }
+  @media (min-width: 1000px) and (orientation: landscape) {
+    #sx-room-list { flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
+    #sx-room-list .sx-room-card { flex: 0 0 calc(50% - 4px); }
+  }
   .sx-room-card {
     background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
     padding: 12px 16px; display: flex; flex-direction: column; gap: 6px;
