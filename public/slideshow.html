@@ -255,24 +255,41 @@
   /* Section label */
   .db-section-label { font-size: 0.72rem; color: #555; text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; }
 
-  /* Weather row */
+  /* Weather — SMHI layout */
+  .db-weather-loading { color: #444; font-size: 0.85rem; padding: 12px; }
+
+  /* Today + Tomorrow: side-by-side large cards */
+  .db-wx-hero { display: flex; gap: 8px; flex-shrink: 0; }
+  .db-wx-hero-card {
+    flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px;
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .db-wx-hero-card.today { border-color: #3a5a8a; background: #1a2a3a; }
+  .db-wx-hero-card.tomorrow { border-color: #2a3a2a; background: #1a2a1a; }
+  .db-wx-hero-label { font-size: 0.65rem; color: #666; text-transform: uppercase; letter-spacing: 0.06em; }
+  .db-wx-hero-top { display: flex; align-items: center; gap: 10px; }
+  .db-wx-hero-icon { font-size: 2.4rem; line-height: 1; }
+  .db-wx-hero-temp { font-size: 2rem; font-weight: 200; color: #fff; }
+  .db-wx-hero-details { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .db-wx-detail { font-size: 0.72rem; color: #777; }
+  .db-wx-detail span { color: #aaa; }
+
+  /* 8-day compact strip */
   .db-weather-row {
-    display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; flex-shrink: 0;
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; flex-shrink: 0;
     scrollbar-width: none;
   }
   .db-weather-row::-webkit-scrollbar { display: none; }
   .db-weather-day {
     flex: 0 0 auto; background: #1a1a1a; border: 1px solid #2a2a2a;
-    border-radius: 12px; padding: 10px 12px;
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    min-width: 64px;
+    border-radius: 10px; padding: 8px 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    min-width: 58px;
   }
-  .db-weather-day.today { border-color: #3a5a8a; background: #1a2a3a; }
-  .db-weather-dow  { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
-  .db-weather-icon { font-size: 1.6rem; line-height: 1; }
-  .db-weather-hi   { font-size: 0.95rem; font-weight: 600; color: #ddd; }
-  .db-weather-lo   { font-size: 0.78rem; color: #555; }
-  .db-weather-loading { color: #444; font-size: 0.85rem; padding: 12px; }
+  .db-weather-dow  { font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 0.04em; }
+  .db-weather-icon { font-size: 1.4rem; line-height: 1; }
+  .db-weather-hi   { font-size: 0.88rem; font-weight: 600; color: #ccc; }
+  .db-weather-precip { font-size: 0.65rem; color: #4a7a4a; }
 
   /* Placeholder screens */
   .db-placeholder {
@@ -657,12 +674,12 @@
           </div>
         </div>
 
-        <!-- Weather 10-day forecast -->
+        <!-- Weather — SMHI ODP Home -->
         <div class="db-section-label">Weather forecast</div>
-        <div id="db-weather-row" class="db-weather-row">
-          <!-- Injected by JS: .db-weather-day items -->
+        <div id="db-wx-hero" class="db-wx-hero">
           <div class="db-weather-loading">Loading…</div>
         </div>
+        <div id="db-weather-row" class="db-weather-row" style="margin-top:6px"></div>
 
         <!-- Info cards row -->
         <div class="db-row db-row-wrap">
@@ -1664,44 +1681,95 @@
     document.getElementById('db-date').textContent  = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' })
   }
 
-  // HA weather condition → emoji
-  function weatherIcon(cond) {
-    const map = {
-      'clear-night':'🌙','cloudy':'☁️','exceptional':'⚠️','fog':'🌫️',
-      'hail':'🌨️','lightning':'⚡','lightning-rainy':'⛈️','partlycloudy':'⛅',
-      'pouring':'🌧️','rainy':'🌦️','snowy':'❄️','snowy-rainy':'🌨️',
-      'sunny':'☀️','windy':'💨','windy-variant':'🌬️'
-    }
-    return map[cond] || '🌡️'
+  // SMHI symbol_code → emoji
+  function smhiIcon(code) {
+    // 1=clear, 2=nearly clear, 3=variable, 4=halfcloudy, 5=cloudy, 6=overcast, 7=fog
+    // 8=light shower, 9=shower, 10=heavy shower
+    // 11=thunderstorm, 12=light sleet shower, 13=sleet shower
+    // 14=light snow shower, 15=snow shower, 16=heavy snow shower
+    // 17=thunder+sleet, 18=light rain, 19=rain, 20=heavy rain
+    // 21=thunder, 22=light sleet, 23=sleet, 24=heavy sleet
+    // 25=light snowfall, 26=snowfall, 27=heavy snowfall
+    const m = {1:'☀️',2:'🌤️',3:'⛅',4:'🌥️',5:'☁️',6:'☁️',7:'🌫️',
+               8:'🌦️',9:'🌧️',10:'🌧️',11:'⛈️',12:'🌨️',13:'🌨️',
+               14:'🌨️',15:'❄️',16:'❄️',17:'⛈️',18:'🌦️',19:'🌧️',
+               20:'🌧️',21:'⛈️',22:'🌨️',23:'🌨️',24:'🌨️',25:'🌨️',26:'❄️',27:'❄️'}
+    return m[code] || '🌡️'
+  }
+
+  function windDir(deg) {
+    const dirs = ['N','NE','E','SE','S','SW','W','NW']
+    return dirs[Math.round(deg / 45) % 8]
+  }
+
+  function smhiHeroCard(attrs, label, cls) {
+    const temp  = attrs.air_temperature != null ? Math.round(attrs.air_temperature) + '°' : '—'
+    const icon  = smhiIcon(attrs.symbol_code)
+    const wind  = attrs.wind_speed != null ? Math.round(attrs.wind_speed) + ' m/s ' + windDir(attrs.wind_from_direction) : ''
+    const gust  = attrs.wind_speed_of_gust != null ? '(gust ' + Math.round(attrs.wind_speed_of_gust) + ')' : ''
+    const hum   = attrs.relative_humidity != null ? attrs.relative_humidity + '% RH' : ''
+    const precip= attrs.precipitation_amount_mean != null ? attrs.precipitation_amount_mean.toFixed(1) + ' mm' : ''
+    const pop   = attrs.probability_of_precipitation != null ? attrs.probability_of_precipitation + '% rain' : ''
+    const vis   = attrs.visibility_in_air != null ? attrs.visibility_in_air.toFixed(0) + ' km vis' : ''
+    return `<div class="db-wx-hero-card ${cls}">
+      <div class="db-wx-hero-label">${label}</div>
+      <div class="db-wx-hero-top">
+        <div class="db-wx-hero-icon">${icon}</div>
+        <div class="db-wx-hero-temp">${temp}</div>
+      </div>
+      <div class="db-wx-hero-details">
+        ${wind ? `<div class="db-wx-detail">💨 <span>${wind} ${gust}</span></div>` : ''}
+        ${hum  ? `<div class="db-wx-detail">💧 <span>${hum}</span></div>` : ''}
+        ${pop  ? `<div class="db-wx-detail">🌧 <span>${pop}</span></div>` : ''}
+        ${precip && parseFloat(precip) > 0 ? `<div class="db-wx-detail">☔ <span>${precip}</span></div>` : ''}
+        ${vis  ? `<div class="db-wx-detail">👁 <span>${vis}</span></div>` : ''}
+      </div>
+    </div>`
   }
 
   async function dbLoadSummary() {
     // Clock
     updateDbClock()
 
-    // Weather forecast
+    // Weather — SMHI ODP Home sensors
     try {
-      const ws = await fetch('/api/ha-state/weather.forecast_home').then(r => r.json())
-      const forecasts = ws.attributes?.forecast || []
-      const row = document.getElementById('db-weather-row')
-      if (forecasts.length) {
-        const todayStr = new Date().toDateString()
-        row.innerHTML = forecasts.slice(0, 10).map((f, i) => {
-          const d = new Date(f.datetime)
-          const dow = i === 0 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' })
-          const hi  = f.temperature != null ? Math.round(f.temperature) + '°' : '—'
-          const lo  = f.templow     != null ? Math.round(f.templow)     + '°' : ''
-          return `<div class="db-weather-day${i===0?' today':''}">
-            <div class="db-weather-dow">${dow}</div>
-            <div class="db-weather-icon">${weatherIcon(f.condition)}</div>
-            <div class="db-weather-hi">${hi}</div>
-            ${lo ? `<div class="db-weather-lo">${lo}</div>` : ''}
-          </div>`
-        }).join('')
-      } else {
-        row.innerHTML = '<div class="db-weather-loading">No forecast data</div>'
+      const dayKeys = ['today','tomorrow','day_2','day_3','day_4','day_5','day_6','day_7','day_8','day_9']
+      const results = await Promise.all(
+        dayKeys.map(k => fetch('/api/ha-state/sensor.smhi_odp_home_' + k).then(r => r.json()))
+      )
+      const hero = document.getElementById('db-wx-hero')
+      const row  = document.getElementById('db-weather-row')
+
+      // Today + Tomorrow hero cards
+      const todayAttrs    = results[0]?.attributes || {}
+      const tomorrowAttrs = results[1]?.attributes || {}
+      const now = new Date()
+      const todayLabel    = 'Today — ' + now.toLocaleDateString('sv-SE', { weekday:'long' })
+      const tomorrowDate  = new Date(now); tomorrowDate.setDate(now.getDate()+1)
+      const tomorrowLabel = 'Tomorrow — ' + tomorrowDate.toLocaleDateString('sv-SE', { weekday:'long' })
+      hero.innerHTML = smhiHeroCard(todayAttrs, todayLabel, 'today') +
+                       smhiHeroCard(tomorrowAttrs, tomorrowLabel, 'tomorrow')
+
+      // Day 2–9 compact strip
+      const weekDays = []
+      for (let i = 2; i < 10; i++) {
+        const attrs = results[i]?.attributes || {}
+        const d = new Date(now); d.setDate(now.getDate() + i)
+        const dow = d.toLocaleDateString('sv-SE', { weekday:'short' })
+        const temp = attrs.air_temperature != null ? Math.round(attrs.air_temperature) + '°' : '—'
+        const pop  = attrs.probability_of_precipitation != null ? attrs.probability_of_precipitation + '%' : ''
+        weekDays.push(`<div class="db-weather-day">
+          <div class="db-weather-dow">${dow}</div>
+          <div class="db-weather-icon">${smhiIcon(attrs.symbol_code)}</div>
+          <div class="db-weather-hi">${temp}</div>
+          ${pop && parseInt(pop) > 10 ? `<div class="db-weather-precip">${pop}</div>` : ''}
+        </div>`)
       }
-    } catch { document.getElementById('db-weather-row').innerHTML = '<div class="db-weather-loading">Unavailable</div>' }
+      row.innerHTML = weekDays.join('')
+    } catch(e) {
+      document.getElementById('db-wx-hero').innerHTML = '<div class="db-weather-loading">Unavailable</div>'
+      document.getElementById('db-weather-row').innerHTML = ''
+    }
 
     // Electricity price via HA template (automation.awtrix_electricity_price_monitor_2 attributes)
     try {
