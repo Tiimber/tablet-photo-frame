@@ -2986,8 +2986,8 @@ I did<!DOCTYPE html>
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null }
     gestureStart = null
 
-    // Swipe down: >80px downward, more vertical than horizontal → open dashboard
-    if (dy > 80 && absDy > absDx * 1.5) {
+    // Swipe down: >40% screen height downward, more vertical than horizontal → open dashboard
+    if (dy > window.innerHeight * 0.4 && absDy > absDx * 1.5) {
       openDashboard()
       return
     }
@@ -3062,7 +3062,7 @@ I did<!DOCTYPE html>
     const dy = y - dbSwipeStart.y
     const adx = Math.abs(dx), ady = Math.abs(dy)
     dbSwipeStart = null
-    if (ady > 60 && ady > adx * 1.5 && dy < 0) { closeDashboard(); return }
+    if (ady > window.innerHeight * 0.4 && ady > adx * 1.5 && dy < 0) { closeDashboard(); return }
     if (adx > 50 && adx > ady * 1.5) {
       if (dx < 0) dbNextScreen(); else dbPrevScreen()
     }
