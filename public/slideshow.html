@@ -119,14 +119,12 @@
     justify-content: center;
     pointer-events: none;
     z-index: 500;
-    opacity: 0;
   }
   #tap-icon-inner {
     font-size: 96px;
     line-height: 1;
     filter: drop-shadow(0 0 24px rgba(0,0,0,0.8));
-    transform: scale(0.7);
-    transition: none;
+    opacity: 0;
   }
   #tap-icon.flash #tap-icon-inner {
     animation: tap-icon-anim 1s ease-out forwards;
@@ -1350,9 +1348,12 @@
     sOrder.value    = config.order
     sFit.value      = config.fit
 
-    // Pause slideshow timer and any playing background videos
+    // Pause slideshow timer, videos, and Ken Burns animations
     if (timer) { clearInterval(timer); timer = null }
     document.querySelectorAll('.slide video').forEach(v => v.pause())
+    document.querySelectorAll('.slide .media-item img').forEach(img => {
+      img.style.animationPlayState = 'paused'
+    })
 
     buildInfoPanels()
     overlay.classList.add('open')
@@ -1364,8 +1365,11 @@
     if (settingsAutoCloseTimer) { clearTimeout(settingsAutoCloseTimer); settingsAutoCloseTimer = null }
     settingsLayout.querySelectorAll('.info-panel').forEach(p => p.remove())
     settingsLayout.classList.remove('layout-col')
-    // Resume any paused background videos
+    // Resume any paused background videos and Ken Burns animations
     document.querySelectorAll('.slide video').forEach(v => v.play().catch(() => {}))
+    document.querySelectorAll('.slide .media-item img').forEach(img => {
+      img.style.animationPlayState = 'running'
+    })
   }
 
   // Reset auto-close timer on any interaction within the overlay
@@ -1434,6 +1438,9 @@
     if (!isPaused) {
       if (timer) { clearInterval(timer); timer = null }
       document.querySelectorAll('.slide video').forEach(v => v.pause())
+      document.querySelectorAll('.slide .media-item img').forEach(img => {
+        img.style.animationPlayState = 'paused'
+      })
       isPaused = true
       showTapIcon('⏸')
       clearTapPauseAutoResume()
@@ -1443,8 +1450,11 @@
       }, 30000)
     } else {
       clearTapPauseAutoResume()
-      isPaused = false
       document.querySelectorAll('.slide video').forEach(v => v.play().catch(() => {}))
+      document.querySelectorAll('.slide .media-item img').forEach(img => {
+        img.style.animationPlayState = 'running'
+      })
+      isPaused = false
       showTapIcon('▶')
       resumeSlideshow()
     }
