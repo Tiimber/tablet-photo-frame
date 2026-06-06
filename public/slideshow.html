@@ -2285,6 +2285,11 @@ I did<!DOCTYPE html>
     { name: 'Game room',       temp: 'sensor.tz3000_rdhukkmi_ts0201_temperature_2', humid: 'sensor.tz3000_rdhukkmi_ts0201_humidity_2' },
     { name: 'Garage',          temp: 'sensor.sensor_13_temperature',                humid: 'sensor.sensor_13_humidity' },
     { name: 'Food cellar',     temp: 'sensor.zbeacon_th01_temperature',             humid: 'sensor.zbeacon_th01_humidity' },
+    { name: 'Outdoors',
+      extras: [
+        { type: 'lawn_mower', entity: 'lawn_mower.navimow_i105e_navimow_i105e', label: 'Lawn mower' },
+      ]
+    },
   ]
 
   const SX_ICON_THERMO = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 13V5A3 3 0 0 0 9 5v8a5 5 0 1 0 6 0M12 4a1 1 0 0 1 1 1v8.17A3 3 0 0 1 12 19a3 3 0 0 1-1-5.83V5a1 1 0 0 1 1-1z"/></svg>`
@@ -2347,10 +2352,20 @@ I did<!DOCTYPE html>
     </div>`
   }
 
+  function sxRenderLawnMower(label, d) {
+    if (!d) return `<div class="sx-extra-row"><span class="sx-extra-label">${label}:</span> <span class="sx-extra-val">—</span></div>`
+    const a = d.attributes || {}
+    const activity = (a.activity || d.state || '').replace(/_/g, ' ')
+    const status = activity.charAt(0).toUpperCase() + activity.slice(1)
+    const battery = a.battery != null ? ` · Battery: ${a.battery}%` : ''
+    return `<div class="sx-extra-row"><span class="sx-extra-label">${label}:</span> <span class="sx-extra-val">${status}${battery}</span></div>`
+  }
+
   function sxRenderExtra(ex, stateMap) {
     const d = stateMap[ex.entity]
-    if (ex.type === 'fan')    return sxRenderFan(ex.label, d)
-    if (ex.type === 'vacuum') return sxRenderVacuum(ex.label, d)
+    if (ex.type === 'fan')        return sxRenderFan(ex.label, d)
+    if (ex.type === 'vacuum')     return sxRenderVacuum(ex.label, d)
+    if (ex.type === 'lawn_mower') return sxRenderLawnMower(ex.label, d)
     // generic fallback
     const val = d ? d.state : '—'
     return `<div class="sx-extra-row"><span class="sx-extra-label">${ex.label}:</span> <span class="sx-extra-val">${val}</span></div>`
@@ -2369,22 +2384,22 @@ I did<!DOCTYPE html>
       allIds.forEach((id, i) => { stateMap[id] = results[i] })
     } catch(e) {}
     list.innerHTML = SX_ROOMS.map(room => {
-      const t = stateMap[room.temp]
-      const h = stateMap[room.humid]
-      const tRaw = t && t.state !== 'unavailable' && t.state !== 'unknown' ? parseFloat(t.state) : NaN
-      const hRaw = h && h.state !== 'unavailable' && h.state !== 'unknown' ? parseFloat(h.state) : NaN
-      const tv = isNaN(tRaw) ? '—' : tRaw.toFixed(1) + '°C'
-      const hv = isNaN(hRaw) ? '—' : Math.round(hRaw) + '%'
-      const tc = sxTempColor(tRaw)
-      const hc = sxHumidColor(hRaw)
       const extrasHtml = (room.extras || []).map(ex => sxRenderExtra(ex, stateMap)).join('')
-      return `<div class="sx-room-card${extrasHtml ? ' sx-room-card-expanded' : ''}">
+      let sensorsHtml = ''
+      if (room.temp) {
+        const t = stateMap[room.temp]
+        const h = stateMap[room.humid]
+        const tRaw = t && t.state !== 'unavailable' && t.state !== 'unknown' ? parseFloat(t.state) : NaN
+        const hRaw = h && h.state !== 'unavailable' && h.state !== 'unknown' ? parseFloat(h.state) : NaN
+        const tv = isNaN(tRaw) ? '—' : tRaw.toFixed(1) + '°C'
+        const hv = isNaN(hRaw) ? '—' : Math.round(hRaw) + '%'
+        sensorsHtml = `<div class="sx-chip" style="color:${sxTempColor(tRaw)}">${SX_ICON_THERMO}${tv}</div>
+            <div class="sx-chip" style="color:${sxHumidColor(hRaw)}">${SX_ICON_HUMID}${hv}</div>`
+      }
+      return `<div class="sx-room-card">
         <div class="sx-room-header">
           <div class="sx-room-name">${room.name}</div>
-          <div class="sx-sensors">
-            <div class="sx-chip" style="color:${tc}">${SX_ICON_THERMO}${tv}</div>
-            <div class="sx-chip" style="color:${hc}">${SX_ICON_HUMID}${hv}</div>
-          </div>
+          ${sensorsHtml ? `<div class="sx-sensors">${sensorsHtml}</div>` : ''}
         </div>${extrasHtml ? `<div class="sx-extras">${extrasHtml}</div>` : ''}
       </div>`
     }).join('')
