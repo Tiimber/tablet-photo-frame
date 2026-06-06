@@ -3,10 +3,11 @@ I did<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
 <title>Slideshow</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; user-select: none; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; user-select: none; color-scheme: dark; }
   img, video { -webkit-user-drag: none; user-drag: none; }
 
   .slide {
@@ -211,7 +212,7 @@ I did<!DOCTYPE html>
     width: 7px; height: 7px; border-radius: 50%;
     background: #444; transition: background 0.2s, transform 0.2s;
   }
-  .db-dot.active { background: #fff; transform: scale(1.25); }
+  .db-dot.active { background: #fff !important; transform: scale(1.25); }
 
   /* Carousel */
   #db-viewport { flex: 1; overflow: hidden; position: relative; }
