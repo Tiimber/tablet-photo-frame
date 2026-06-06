@@ -473,6 +473,12 @@ app.post('/api/resume-slideshow', (req, res) => {
   res.json({ ok: true })
 })
 
+// ── IKEA remote / blueprint endpoints ────────────────────────────────────────
+app.post('/api/remote/next',         (req, res) => { broadcast({ type: 'remote-next' });         res.json({ ok: true }) })
+app.post('/api/remote/prev',         (req, res) => { broadcast({ type: 'remote-prev' });         res.json({ ok: true }) })
+app.post('/api/remote/toggle-pause', (req, res) => { broadcast({ type: 'remote-toggle-pause' }); res.json({ ok: true }) })
+app.post('/api/remote/settings',     (req, res) => { broadcast({ type: 'remote-settings' });     res.json({ ok: true }) })
+
 // Queue status endpoint — polled by manage.html as fallback
 app.get('/api/queue', (req, res) => {
   res.json(queue.map(({ id, outName, thumbName, status, error, progress }) =>

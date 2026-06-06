@@ -1775,6 +1775,17 @@
       } else if (msg.type === 'photo-deleted') {
         photos = photos.filter(p => p !== msg.filename)
         document.getElementById('empty').classList.toggle('visible', photos.length === 0)
+      } else if (msg.type === 'remote-next') {
+        window.nextSlide()
+        if (isPaused) { isPaused = false; document.getElementById('settings-panel').classList.remove('paused') }
+      } else if (msg.type === 'remote-prev') {
+        window.prevSlide()
+        if (isPaused) { isPaused = false; document.getElementById('settings-panel').classList.remove('paused') }
+      } else if (msg.type === 'remote-toggle-pause') {
+        tapPause()
+      } else if (msg.type === 'remote-settings') {
+        if (!overlay.classList.contains('open')) openSettings()
+        else { closeSettings(); if (!isPaused) resumeSlideshow() }
       }
     })
 
