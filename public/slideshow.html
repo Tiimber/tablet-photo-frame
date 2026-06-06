@@ -2102,7 +2102,7 @@ I did<!DOCTYPE html>
 
     // Electricity – nordpool today/tomorrow float arrays, line graph + carousel
     try {
-      const priceColor = v => v <= 0.5 ? '#4caf50' : v <= 1.2 ? '#8bc34a' : v <= 2.0 ? '#ffc107' : '#f44336'
+      const priceColor = v => v <= 0.5 ? '#00FF00' : v <= 1.5 ? '#FFFFFF' : v <= 3.0 ? '#FFFF00' : v <= 5.0 ? '#FFA500' : '#FF0000'
       const r = await fetch('/api/ha-template', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ template: "{{ state_attr('sensor.nordpool','today') | tojson }} ||| {{ state_attr('sensor.nordpool','tomorrow') | tojson }}" })
@@ -2629,7 +2629,7 @@ I did<!DOCTYPE html>
   let ccSocPending = false  // waiting for plan refresh
 
   // Shared price-color helper (same as Summary)
-  const ccPriceColor = v => v <= 0.5 ? '#4caf50' : v <= 1.2 ? '#8bc34a' : v <= 2.0 ? '#ffc107' : '#f44336'
+  const ccPriceColor = v => v <= 0.5 ? '#00FF00' : v <= 1.5 ? '#FFFFFF' : v <= 3.0 ? '#FFFF00' : v <= 5.0 ? '#FFA500' : '#FF0000'
 
   async function ccTurnOffAllLights() {
     const btn = document.getElementById('cc-lights-off-btn')
