@@ -694,9 +694,9 @@
         <!-- Info cards row -->
         <div class="db-row db-row-wrap">
           <div class="db-card db-card-info">
-            <div class="db-info-label">⚡ Electricity</div>
-            <div class="db-info-value" id="db-elec-price">—</div>
-            <div class="db-info-sub" id="db-elec-sub"></div>
+            <div class="db-info-label">💡 Electricity</div>
+            <div class="db-info-value" id="db-elec-price" style="font-weight:700">—</div>
+            <div class="db-info-sub" id="db-elec-sub" style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><span style="color:#888;font-size:0.75em">next:</span><span id="db-elec-next" style="font-weight:600">—</span></div>
           </div>
           <div class="db-card db-card-info">
             <div class="db-info-label">🚗 Charging plan</div>
@@ -1783,14 +1783,24 @@
       document.getElementById('db-weather-row').innerHTML = ''
     }
 
-    // Electricity price via HA template (automation.awtrix_electricity_price_monitor_2 attributes)
+    // Electricity price – current (incl fees) + tier color + next hour spot
     try {
-      const r = await fetch('/api/ha-template', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template: "{{ state_attr('automation.awtrix_electricity_price_monitor_2','current_price') | round(2) }} kr/kWh" })
-      })
-      document.getElementById('db-elec-price').textContent = r.ok ? await r.text() : '—'
+      const tierColor = t => ({ very_cheap:'#4caf50', cheap:'#8bc34a', acceptable:'#ffc107', expensive:'#f44336' }[t] || '#fff')
+      const spotColor = v => v <= 0.1 ? '#4caf50' : v <= 1.5 ? '#8bc34a' : v <= 2.5 ? '#ffc107' : '#f44336'
+      const [rPrice, rTier, rNext] = await Promise.all([
+        fetch('/api/ha-template', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ template:"{{ states('sensor.current_price_incl_fees') | round(2) }}" }) }),
+        fetch('/api/ha-template', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ template:"{{ states('sensor.ac_simulation_price_tier') }}" }) }),
+        fetch('/api/ha-template', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ template:"{{ states('sensor.electricity_next_price') | round(2) }}" }) })
+      ])
+      const price = rPrice.ok ? (await rPrice.text()).trim() : null
+      const tier  = rTier.ok  ? (await rTier.text()).trim()  : null
+      const next  = rNext.ok  ? (await rNext.text()).trim()  : null
+      const elP = document.getElementById('db-elec-price')
+      const elN = document.getElementById('db-elec-next')
+      elP.textContent = price ? price + ' kr/kWh' : '—'
+      elP.style.color = tier ? tierColor(tier) : '#fff'
+      elN.textContent = next ? next + ' kr' : '—'
+      elN.style.color = next ? spotColor(parseFloat(next)) : '#fff'
     } catch { document.getElementById('db-elec-price').textContent = '—' }
 
     // Car charging plan
