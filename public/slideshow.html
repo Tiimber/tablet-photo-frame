@@ -2130,7 +2130,7 @@
         if (dashboardOpen) { dbPrevScreen() }
         else { window.prevSlide(); if (isPaused) { isPaused = false; document.getElementById('settings-panel').classList.remove('paused') } }
       } else if (msg.type === 'remote-toggle-pause') {
-        tapPause()
+        if (!dashboardOpen) tapPause()
       } else if (msg.type === 'remote-settings') {
         if (dashboardOpen) { /* ignore */ }
         else if (!overlay.classList.contains('open')) openSettings()
