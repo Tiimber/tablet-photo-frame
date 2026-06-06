@@ -2279,7 +2279,13 @@ I did<!DOCTYPE html>
     { name: 'Back entrance',   temp: 'sensor.back_hallway_t_h_sensor_temperature',  humid: 'sensor.back_hallway_t_h_sensor_humidity' },
     { name: 'Walk-in closet',  temp: 'sensor.zbeacon_th01_temperature_2',           humid: 'sensor.zbeacon_th01_humidity_2' },
     { name: 'Bathroom',        temp: 'sensor.tz3000_rdhukkmi_ts0201_temperature',   humid: 'sensor.tz3000_rdhukkmi_ts0201_humidity' },
-    { name: 'Laundry room',    temp: 'sensor.sensor_9_temperature',                 humid: 'sensor.sensor_9_humidity' },
+    { name: 'Laundry room',    temp: 'sensor.sensor_9_temperature',                 humid: 'sensor.sensor_9_humidity',
+      extras: [
+        { type: 'generic', entity: 'input_select.laundry_state',   label: 'Laundry' },
+        { type: 'generic', entity: 'sensor.grillplats_plug_power', label: 'Washer power' },
+        { type: 'generic', entity: 'sensor.emos_plug_power',       label: 'Dryer power' },
+      ]
+    },
     { name: 'Exercise room',   temp: 'sensor.sensor_8_temperature',                 humid: 'sensor.sensor_8_humidity' },
     { name: 'Play room',       temp: 'sensor.sensor_7_temperature',                 humid: 'sensor.sensor_7_humidity' },
     { name: 'Upstairs lobby',  temp: 'sensor.sensor_10_temperature',                humid: 'sensor.sensor_10_humidity' },
