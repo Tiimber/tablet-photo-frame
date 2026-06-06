@@ -756,15 +756,22 @@ I did<!DOCTYPE html>
   /* ── Control Center ─────────────────────────────────────────────────────── */
   #cc-screen { display: flex; flex-direction: column; gap: 12px; }
 
+  /* Top row: lights + AC + charging side by side */
+  .cc-top-row {
+    display: flex; gap: 10px; flex-wrap: wrap; flex-shrink: 0;
+  }
+  .cc-top-row > * { flex: 1 1 140px; min-width: 130px; }
+
   /* Lights off shortcut */
   .cc-lights-off-btn {
-    width: 100%; padding: 14px 16px;
+    width: 100%; height: 100%; min-height: 80px; padding: 12px 14px;
     background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
-    color: #c8922a; font-size: 1rem; font-weight: 600; cursor: pointer;
-    display: flex; align-items: center; gap: 10px;
+    color: #c8922a; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
     transition: background 0.15s, border-color 0.15s;
     -webkit-tap-highlight-color: transparent;
   }
+  .cc-lights-off-btn .cc-btn-icon { font-size: 1.6rem; }
   .cc-lights-off-btn:active { background: #252525; border-color: #7a5a20; }
   .cc-lights-off-btn.cc-done { color: #4caf50; border-color: #2a4a2a; }
 
@@ -774,53 +781,66 @@ I did<!DOCTYPE html>
   .cc-elec-mini-price { font-size: 1.6rem; font-weight: 700; line-height: 1; }
   .cc-elec-mini-unit { font-size: 0.72rem; color: #555; }
 
-  /* AC card */
+  /* AC card (in top row) */
   .cc-ac-card { flex-shrink: 0; }
-  .cc-ac-body { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .cc-ac-inner {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding-top: 4px;
+  }
   .cc-ac-temp {
-    font-size: 2.4rem; font-weight: 200; color: #fff; line-height: 1;
-    min-width: 80px; text-align: center; transition: color 0.3s;
+    font-size: 2rem; font-weight: 200; color: #fff; line-height: 1;
+    transition: color 0.3s;
   }
   .cc-ac-temp.cc-pending { color: #555; }
-  .cc-ac-mode { font-size: 0.78rem; color: #666; text-align: center; margin-top: 2px; }
-  .cc-ac-btns { display: flex; flex-direction: column; gap: 6px; }
+  .cc-ac-mode { font-size: 0.72rem; color: #666; }
+  .cc-ac-btns { display: flex; gap: 8px; margin-top: 4px; }
   .cc-ac-btn {
-    width: 44px; height: 44px; border-radius: 50%;
+    width: 40px; height: 40px; border-radius: 50%;
     background: #252525; border: 1px solid #3a3a3a; color: #ccc;
-    font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
     transition: background 0.15s; -webkit-tap-highlight-color: transparent;
   }
   .cc-ac-btn:active { background: #3a3a3a; }
 
-  /* Charging card */
+  /* Charging card (in top row) */
   .cc-charge-card { flex-shrink: 0; }
-  .cc-charge-body { display: flex; gap: 10px; margin-top: 8px; align-items: flex-start; }
+  .cc-charge-body { display: flex; gap: 8px; margin-top: 6px; align-items: flex-start; }
   .cc-charge-img-wrap {
-    flex: 0 0 auto; width: 120px;
-    background: #111; border-radius: 8px; overflow: hidden;
-    display: flex; align-items: center; justify-content: center;
+    flex: 0 0 auto; width: 80px;
+    background: #111; border-radius: 6px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; align-self: stretch;
   }
   .cc-charge-img { width: 100%; display: block; object-fit: contain; }
-  .cc-charge-img-placeholder { color: #333; font-size: 2rem; padding: 20px; }
-  .cc-charge-controls { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-  .cc-charge-field { display: flex; flex-direction: column; gap: 3px; }
-  .cc-charge-label { font-size: 0.68rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
-  .cc-charge-value { font-size: 1.1rem; font-weight: 600; color: #ddd; }
-  .cc-charge-input-row { display: flex; align-items: center; gap: 6px; }
+  .cc-charge-img-placeholder { color: #333; font-size: 1.4rem; padding: 10px; }
+  .cc-charge-controls { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .cc-charge-field { display: flex; flex-direction: column; gap: 2px; }
+  .cc-charge-label { font-size: 0.62rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+  .cc-charge-value { font-size: 0.95rem; font-weight: 600; color: #ddd; }
+  .cc-charge-input-row { display: flex; align-items: center; gap: 4px; }
   .cc-charge-adj-btn {
-    width: 32px; height: 32px; border-radius: 50%;
+    width: 28px; height: 28px; border-radius: 50%;
     background: #252525; border: 1px solid #3a3a3a; color: #ccc;
-    font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
     transition: background 0.15s; -webkit-tap-highlight-color: transparent; flex-shrink: 0;
   }
   .cc-charge-adj-btn:active { background: #3a3a3a; }
-  .cc-charge-soc-val { font-size: 1.1rem; font-weight: 600; color: #ddd; min-width: 44px; text-align: center; }
+  .cc-charge-soc-val { font-size: 0.95rem; font-weight: 600; color: #ddd; min-width: 36px; text-align: center; }
   .cc-charge-soc-val.cc-pending { color: #555; }
-  .cc-charge-updating { font-size: 0.7rem; color: #555; font-style: italic; }
+  .cc-charge-updating { font-size: 0.65rem; color: #555; font-style: italic; }
+  /* Departure time editable */
+  .cc-departure-input {
+    background: none; border: none; border-bottom: 1px solid #3a3a3a;
+    color: #ddd; font-size: 0.95rem; font-weight: 600; width: 70px;
+    outline: none; padding: 0; cursor: text;
+  }
+  .cc-departure-input:focus { border-bottom-color: #4a9eff; }
 
-  /* Camera feeds */
-  .cc-cameras { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  /* Camera feeds — wrap row, min 500px each, stretch to fill row */
+  .cc-cameras {
+    display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0;
+  }
   .cc-camera-card {
+    flex: 1 1 500px;
     background: #111; border: 1px solid #2a2a2a; border-radius: 10px;
     overflow: hidden; position: relative;
   }
@@ -830,7 +850,7 @@ I did<!DOCTYPE html>
     background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px;
     pointer-events: none; z-index: 1;
   }
-  .cc-camera-img { width: 100%; display: block; object-fit: cover; min-height: 80px; background: #111; }
+  .cc-camera-img { width: 100%; display: block; object-fit: cover; background: #111; }
   .cc-camera-unavail { color: #333; font-size: 0.75rem; padding: 20px; text-align: center; }
 </style>
 </head>
@@ -902,12 +922,55 @@ I did<!DOCTYPE html>
         <div class="db-screen-title">Control Center</div>
         <div id="cc-screen">
 
-          <!-- Lights off shortcut -->
-          <button class="cc-lights-off-btn" id="cc-lights-off-btn" onclick="ccTurnOffAllLights()">
-            <span>💡</span><span>Turn off all lights</span>
-          </button>
+          <!-- Row 1: Lights off + AC Temperature + Car Charging -->
+          <div class="cc-top-row">
 
-          <!-- Electricity price graph -->
+            <!-- Lights off -->
+            <button class="cc-lights-off-btn" id="cc-lights-off-btn" onclick="ccTurnOffAllLights()">
+              <span class="cc-btn-icon">💡</span><span>Turn off all lights</span>
+            </button>
+
+            <!-- AC Temperature -->
+            <div class="db-card cc-ac-card">
+              <div class="db-info-label">❄️ AC Temperature</div>
+              <div class="cc-ac-inner">
+                <div class="cc-ac-temp" id="cc-ac-temp">—</div>
+                <div class="cc-ac-mode" id="cc-ac-mode"></div>
+                <div class="cc-ac-btns">
+                  <button class="cc-ac-btn" onclick="ccAcAdjust('decrement')">－</button>
+                  <button class="cc-ac-btn" onclick="ccAcAdjust('increment')">＋</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Car Charging -->
+            <div class="db-card cc-charge-card">
+              <div class="db-info-label">🚗 Car Charging</div>
+              <div class="cc-charge-body">
+                <div class="cc-charge-img-wrap" id="cc-charge-img-wrap">
+                  <div class="cc-charge-img-placeholder">📋</div>
+                </div>
+                <div class="cc-charge-controls">
+                  <div class="cc-charge-field">
+                    <div class="cc-charge-label">Departure</div>
+                    <input class="cc-departure-input" id="cc-departure" type="time" onchange="ccSetDeparture(this.value)">
+                  </div>
+                  <div class="cc-charge-field">
+                    <div class="cc-charge-label">Target SoC</div>
+                    <div class="cc-charge-input-row">
+                      <button class="cc-charge-adj-btn" onclick="ccSocAdjust(-5)">－</button>
+                      <div class="cc-charge-soc-val" id="cc-soc-val">—</div>
+                      <button class="cc-charge-adj-btn" onclick="ccSocAdjust(+5)">＋</button>
+                    </div>
+                    <div class="cc-charge-updating" id="cc-soc-status"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /cc-top-row -->
+
+          <!-- Row 2: Electricity price graph -->
           <div class="db-card cc-elec-mini">
             <div class="cc-elec-mini-header">
               <div class="db-info-label">⚡ Electricity now</div>
@@ -915,46 +978,6 @@ I did<!DOCTYPE html>
               <div class="cc-elec-mini-unit">kr/kWh</div>
             </div>
             <svg class="db-elec-graph" id="cc-elec-graph" preserveAspectRatio="none"></svg>
-          </div>
-
-          <!-- AC control -->
-          <div class="db-card cc-ac-card">
-            <div class="db-info-label">❄️ AC — Boost temperature</div>
-            <div class="cc-ac-body">
-              <div>
-                <div class="cc-ac-temp" id="cc-ac-temp">—</div>
-                <div class="cc-ac-mode" id="cc-ac-mode"></div>
-              </div>
-              <div class="cc-ac-btns">
-                <button class="cc-ac-btn" onclick="ccAcAdjust('increment')">＋</button>
-                <button class="cc-ac-btn" onclick="ccAcAdjust('decrement')">－</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Car charging override -->
-          <div class="db-card cc-charge-card">
-            <div class="db-info-label">🚗 Charging plan override</div>
-            <div class="cc-charge-body">
-              <div class="cc-charge-img-wrap" id="cc-charge-img-wrap">
-                <div class="cc-charge-img-placeholder">📋</div>
-              </div>
-              <div class="cc-charge-controls">
-                <div class="cc-charge-field">
-                  <div class="cc-charge-label">Next departure</div>
-                  <div class="cc-charge-value" id="cc-departure">—</div>
-                </div>
-                <div class="cc-charge-field">
-                  <div class="cc-charge-label">Target SoC</div>
-                  <div class="cc-charge-input-row">
-                    <button class="cc-charge-adj-btn" onclick="ccSocAdjust(-5)">－</button>
-                    <div class="cc-charge-soc-val" id="cc-soc-val">—</div>
-                    <button class="cc-charge-adj-btn" onclick="ccSocAdjust(+5)">＋</button>
-                  </div>
-                  <div class="cc-charge-updating" id="cc-soc-status"></div>
-                </div>
-              </div>
-            </div>
           </div>
 
           <!-- Camera feeds -->
@@ -2733,7 +2756,7 @@ I did<!DOCTYPE html>
       const r = await fetch('/api/ha-state/time.next_session_departure')
       const d = await r.json()
       const el = document.getElementById('cc-departure')
-      if (el) el.textContent = (d && d.state && d.state !== 'unavailable') ? d.state : '—'
+      if (el && d && d.state && d.state !== 'unavailable') el.value = d.state.slice(0,5)
     } catch {}
     // Target SoC
     try {
@@ -2748,6 +2771,21 @@ I did<!DOCTYPE html>
     // Charging plan image
     ccRefreshChargingImage()
   }
+
+  async function ccSetDeparture(val) {
+    // val is HH:MM from the time input
+    if (!val) return
+    const timeVal = val.length === 5 ? val + ':00' : val  // ensure HH:MM:SS
+    try {
+      await fetch('/api/ha-service', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: 'time', service: 'set_value', data: { entity_id: 'time.next_session_departure', time: timeVal } })
+      })
+      // Refresh plan image after a short delay
+      setTimeout(ccRefreshChargingImage, 3000)
+    } catch {}
+  }
+  window.ccSetDeparture = ccSetDeparture
 
   function ccRefreshChargingImage() {
     const wrap = document.getElementById('cc-charge-img-wrap')
