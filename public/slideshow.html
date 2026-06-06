@@ -333,12 +333,17 @@ I did<!DOCTYPE html>
   #sx-room-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; }
   .sx-room-card {
     background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
-    padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; display: flex; flex-direction: column; gap: 6px;
   }
+  .sx-room-header { display: flex; align-items: center; gap: 12px; }
   .sx-room-name { font-size: 0.9rem; font-weight: 500; color: #bbb; flex: 0 0 110px; }
   .sx-sensors { display: flex; flex-wrap: wrap; gap: 4px 16px; flex: 1; }
   .sx-chip { font-size: 0.9rem; font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
   .sx-chip svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.7; }
+  .sx-extras { display: flex; flex-direction: column; gap: 3px; padding-top: 4px; border-top: 1px solid #252525; }
+  .sx-extra-row { font-size: 0.78rem; color: #999; display: flex; gap: 6px; flex-wrap: wrap; }
+  .sx-extra-label { color: #555; flex-shrink: 0; }
+  .sx-extra-val { color: #aaa; }
   .sx-loading { color: #444; font-size: 0.8rem; }
 
   /* ── Lights UI ──────────────────────────────────────────────────────────── */
@@ -2261,7 +2266,12 @@ I did<!DOCTYPE html>
 
   // ── Sensors screen ───────────────────────────────────────────────────────
   const SX_ROOMS = [
-    { name: 'Living room',     temp: 'sensor.tz3000_rdhukkmi_ts0201_temperature_3', humid: 'sensor.tz3000_rdhukkmi_ts0201_humidity_3' },
+    { name: 'Living room',     temp: 'sensor.tz3000_rdhukkmi_ts0201_temperature_3', humid: 'sensor.tz3000_rdhukkmi_ts0201_humidity_3',
+      extras: [
+        { type: 'fan',     entity: 'fan.ikea_of_sweden_starkvind_air_purifier', label: 'Air purifier' },
+        { type: 'vacuum',  entity: 'vacuum.downstairs_vacuum',                  label: 'Vacuum' },
+      ]
+    },
     { name: 'Kitchen',         temp: 'sensor.zbeacon_th01_temperature_3',           humid: 'sensor.zbeacon_th01_humidity_3' },
     { name: 'Bedroom',         temp: 'sensor.sensor_12_temperature',                humid: 'sensor.sensor_12_humidity' },
     { name: 'Entrance',        temp: 'sensor.sensor_11_temperature',                humid: 'sensor.sensor_11_humidity' },
@@ -2282,27 +2292,77 @@ I did<!DOCTYPE html>
 
   function sxTempColor(v) {
     if (isNaN(v)) return '#888'
-    if (v < 20)  return '#5b9bd5'  // blue — cold
-    if (v < 22)  return '#4caf50'  // green — comfortable
-    if (v < 24)  return '#ffc107'  // yellow — warm
-    if (v < 25)  return '#ff9800'  // orange — hot
-    return '#f44336'               // red — very hot
+    if (v < 20)  return '#5b9bd5'
+    if (v < 22)  return '#4caf50'
+    if (v < 24)  return '#ffc107'
+    if (v < 25)  return '#ff9800'
+    return '#f44336'
   }
 
   function sxHumidColor(v) {
     if (isNaN(v)) return '#888'
-    if (v < 30)  return '#5b9bd5'  // blue — dry
-    if (v < 50)  return '#4caf50'  // green — ideal
-    if (v < 60)  return '#ffc107'  // yellow — slightly humid
-    if (v < 70)  return '#ff9800'  // orange — humid
-    return '#f44336'               // red — very humid
+    if (v < 30)  return '#5b9bd5'
+    if (v < 50)  return '#4caf50'
+    if (v < 60)  return '#ffc107'
+    if (v < 70)  return '#ff9800'
+    return '#f44336'
+  }
+
+  function sxRenderFan(label, d) {
+    if (!d) return `<div class="sx-extra-row"><span class="sx-extra-label">${label}:</span> <span class="sx-extra-val">—</span></div>`
+    const pct  = d.attributes?.percentage != null ? d.attributes.percentage + '%' : '—'
+    const mode = d.attributes?.preset_mode === 'auto' ? 'Auto' : (d.state === 'on' ? 'Manual' : 'Off')
+    const val  = d.state === 'off' ? 'Off' : `${mode} · ${pct}`
+    return `<div class="sx-extra-row"><span class="sx-extra-label">${label}:</span> <span class="sx-extra-val">${val}</span></div>`
+  }
+
+  function sxRenderVacuum(label, d) {
+    if (!d) return `<div class="sx-extra-row"><span class="sx-extra-label">${label}:</span> <span class="sx-extra-val">—</span></div>`
+    const a = d.attributes || {}
+    const vacState = d.state
+    const status   = a.status || ''
+    const mode     = a.cleaning_mode || ''
+    const rooms    = { 1:'Hallway', 2:'Bedroom', 3:'Back Hallway', 4:'Living Room', 6:'Kitchen' }
+    const roomName = rooms[a.current_segment] || ''
+
+    let displayStatus
+    if (vacState === 'cleaning' && mode === 'Sweeping and mopping') displayStatus = 'Mopping'
+    else if (['Remote control','Standby'].includes(status)) displayStatus = status
+    else displayStatus = vacState.charAt(0).toUpperCase() + vacState.slice(1)
+
+    let lines = [`${displayStatus}`]
+    if (vacState === 'cleaning') {
+      if (roomName) lines.push(`Room: ${roomName}`)
+      lines.push(`${a.cleaned_area || 0} m² · ${a.cleaning_time || 0} min · ${mode}`)
+    } else {
+      lines.push(`Battery: ${a.battery_level}% · Filter: ${a.filter_left}%`)
+      lines.push(`Brush: ${a.main_brush_left}% / ${a.side_brush_left}%`)
+    }
+    if (a.error && a.error !== 'No error') lines.push(`⚠ ${a.error}`)
+    if (a.auto_empty_status && a.auto_empty_status !== 'Idle') lines.push(`Auto-empty: ${a.auto_empty_status}`)
+
+    return `<div class="sx-extra-row sx-extra-multiline">
+      <span class="sx-extra-label">${label}:</span>
+      <span class="sx-extra-val">${lines.join(' · ')}</span>
+    </div>`
+  }
+
+  function sxRenderExtra(ex, stateMap) {
+    const d = stateMap[ex.entity]
+    if (ex.type === 'fan')    return sxRenderFan(ex.label, d)
+    if (ex.type === 'vacuum') return sxRenderVacuum(ex.label, d)
+    // generic fallback
+    const val = d ? d.state : '—'
+    return `<div class="sx-extra-row"><span class="sx-extra-label">${ex.label}:</span> <span class="sx-extra-val">${val}</span></div>`
   }
 
   async function dbLoadSensors() {
     const list = document.getElementById('sx-room-list')
     if (!list) return
     list.innerHTML = '<div class="sx-loading">Loading…</div>'
-    const allIds = SX_ROOMS.flatMap(r => [r.temp, r.humid])
+    const thIds  = SX_ROOMS.flatMap(r => [r.temp, r.humid])
+    const exIds  = SX_ROOMS.flatMap(r => (r.extras || []).map(e => e.entity))
+    const allIds = [...new Set([...thIds, ...exIds])]
     let stateMap = {}
     try {
       const results = await Promise.all(allIds.map(id => fetch('/api/ha-state/' + id).then(r => r.json()).catch(() => null)))
@@ -2317,12 +2377,15 @@ I did<!DOCTYPE html>
       const hv = isNaN(hRaw) ? '—' : Math.round(hRaw) + '%'
       const tc = sxTempColor(tRaw)
       const hc = sxHumidColor(hRaw)
-      return `<div class="sx-room-card">
-        <div class="sx-room-name">${room.name}</div>
-        <div class="sx-sensors">
-          <div class="sx-chip" style="color:${tc}">${SX_ICON_THERMO}${tv}</div>
-          <div class="sx-chip" style="color:${hc}">${SX_ICON_HUMID}${hv}</div>
-        </div>
+      const extrasHtml = (room.extras || []).map(ex => sxRenderExtra(ex, stateMap)).join('')
+      return `<div class="sx-room-card${extrasHtml ? ' sx-room-card-expanded' : ''}">
+        <div class="sx-room-header">
+          <div class="sx-room-name">${room.name}</div>
+          <div class="sx-sensors">
+            <div class="sx-chip" style="color:${tc}">${SX_ICON_THERMO}${tv}</div>
+            <div class="sx-chip" style="color:${hc}">${SX_ICON_HUMID}${hv}</div>
+          </div>
+        </div>${extrasHtml ? `<div class="sx-extras">${extrasHtml}</div>` : ''}
       </div>`
     }).join('')
   }
