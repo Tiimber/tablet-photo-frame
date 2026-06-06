@@ -164,6 +164,90 @@
     100% { opacity: 0; transform: scale(1.25); }
   }
 
+  /* ── Dashboard overlay ──────────────────────────────────────────────────── */
+  #dashboard-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 800;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 40px 24px 24px;
+    overflow-y: auto;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    animation: db-slide-in 0.28s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  #dashboard-overlay.open { display: flex; }
+  #dashboard-overlay.closing {
+    animation: db-slide-out 0.22s ease-in both;
+  }
+  @keyframes db-slide-in {
+    from { transform: translateY(-100%); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+  }
+  @keyframes db-slide-out {
+    from { transform: translateY(0);     opacity: 1; }
+    to   { transform: translateY(-100%); opacity: 0; }
+  }
+
+  #dashboard-close {
+    position: absolute;
+    top: 14px; right: 18px;
+    background: none; border: none;
+    color: #555; font-size: 1.8rem; cursor: pointer; line-height: 1;
+  }
+  #dashboard-close:hover { color: #ccc; }
+
+  #dashboard-swipe-hint {
+    position: absolute;
+    top: 10px; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 4px;
+    background: #444; border-radius: 2px;
+  }
+
+  .db-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    width: 100%;
+    max-width: 700px;
+    margin-top: 8px;
+  }
+
+  .db-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-height: 120px;
+    justify-content: center;
+  }
+
+  /* Clock card */
+  #db-clock { font-size: 2.8rem; font-weight: 200; color: #fff; letter-spacing: -0.02em; line-height: 1; }
+  #db-date  { font-size: 0.82rem; color: #888; letter-spacing: 0.04em; }
+
+  /* Stat cards */
+  .db-stat-icon { font-size: 1.6rem; }
+  .db-stat-label { font-size: 0.72rem; color: #666; text-transform: uppercase; letter-spacing: 0.06em; }
+  .db-stat-value { font-size: 1.5rem; font-weight: 600; color: #ddd; }
+  .db-stat-unit  { font-size: 0.75rem; color: #555; }
+
+  /* Shortcut card */
+  .db-shortcut {
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .db-shortcut:active { background: #252525; }
+  .db-shortcut-icon  { font-size: 2rem; }
+  .db-shortcut-label { font-size: 0.8rem; color: #888; text-align: center; }
+
   /* Settings overlay */
   #settings-overlay {
     display: none;
@@ -506,6 +590,43 @@
 <div id="counter"></div>
 <canvas id="fx-canvas"></canvas>
 <div id="tap-icon"><span id="tap-icon-inner"></span></div>
+
+<!-- Dashboard overlay (swipe-down) -->
+<div id="dashboard-overlay">
+  <div id="dashboard-swipe-hint"></div>
+  <button id="dashboard-close" onclick="closeDashboard()">✕</button>
+  <div class="db-grid">
+
+    <!-- Clock card -->
+    <div class="db-card" style="grid-column: span 2;">
+      <div id="db-clock">00:00</div>
+      <div id="db-date">—</div>
+    </div>
+
+    <!-- Placeholder: weather stat -->
+    <div class="db-card">
+      <div class="db-stat-icon">🌡️</div>
+      <div class="db-stat-label">Indoor</div>
+      <div class="db-stat-value" id="db-temp">—</div>
+      <div class="db-stat-unit">°C</div>
+    </div>
+
+    <!-- Placeholder: another stat -->
+    <div class="db-card">
+      <div class="db-stat-icon">💧</div>
+      <div class="db-stat-label">Humidity</div>
+      <div class="db-stat-value" id="db-humidity">—</div>
+      <div class="db-stat-unit">%</div>
+    </div>
+
+    <!-- Placeholder: shortcut button -->
+    <div class="db-card db-shortcut" onclick="dbShortcut('lights_off')" title="Lights off">
+      <div class="db-shortcut-icon">💡</div>
+      <div class="db-shortcut-label">Lights off</div>
+    </div>
+
+  </div>
+</div>
 
 <!-- Settings overlay (long-press) -->
 <div id="settings-overlay">
@@ -1443,10 +1564,63 @@
     resumeSlideshow()
   })
 
+  // ── Dashboard overlay ────────────────────────────────────────────────────
+  const dashboardEl = document.getElementById('dashboard-overlay')
+  let dashboardOpen = false
+  let dbClockTimer = null
+
+  function updateDbClock() {
+    const now = new Date()
+    const hh = String(now.getHours()).padStart(2,'0')
+    const mm = String(now.getMinutes()).padStart(2,'0')
+    document.getElementById('db-clock').textContent = hh + ':' + mm
+    document.getElementById('db-date').textContent = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' })
+  }
+
+  function openDashboard() {
+    if (dashboardOpen) return
+    dashboardOpen = true
+    // Pause slideshow while dashboard is open
+    if (!isPaused) {
+      if (timer) { clearInterval(timer); timer = null }
+      document.querySelectorAll('.slide video').forEach(v => v.pause())
+      document.querySelectorAll('.slide .media-item img').forEach(img => { img.style.animationPlayState = 'paused' })
+    }
+    dashboardEl.classList.remove('closing')
+    dashboardEl.classList.add('open')
+    updateDbClock()
+    dbClockTimer = setInterval(updateDbClock, 10000)
+  }
+
+  function closeDashboard() {
+    if (!dashboardOpen) return
+    dashboardOpen = false
+    clearInterval(dbClockTimer); dbClockTimer = null
+    dashboardEl.classList.add('closing')
+    dashboardEl.addEventListener('animationend', () => {
+      dashboardEl.classList.remove('open','closing')
+    }, { once: true })
+    // Resume slideshow
+    if (!isPaused) resumeSlideshow()
+  }
+
+  // Placeholder: called when a shortcut card is tapped
+  function dbShortcut(action) {
+    fetch('/api/dashboard/shortcut', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    }).catch(() => {})
+  }
+
+  window.openDashboard  = openDashboard
+  window.closeDashboard = closeDashboard
+
   // ── Unified gesture handler ───────────────────────────────────────────────
   // Long press (≥500ms, <8px movement) → open settings
   // Short tap (<500ms, <10px movement) → pause/resume slideshow
-  // Swipe (>50px horizontal, more horizontal than vertical) → next/prev slide
+  // Swipe left/right (>50px horizontal) → next/prev slide
+  // Swipe down (>80px vertical, more vertical than horizontal) → open dashboard
 
   let gestureStart = null          // { x, y, t } on press start
   let longPressTimer = null        // fires after 500ms → open settings
@@ -1493,6 +1667,7 @@
   }
 
   function onGestureStart(x, y) {
+    if (dashboardOpen) return
     if (overlay.classList.contains('open')) return
     gestureStart = { x, y, t: Date.now() }
     longPressTimer = setTimeout(() => {
@@ -1512,6 +1687,12 @@
     // Always cancel long-press timer on release (short interaction)
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null }
     gestureStart = null
+
+    // Swipe down: >80px downward, more vertical than horizontal → open dashboard
+    if (dy > 80 && absDy > absDx * 1.5) {
+      openDashboard()
+      return
+    }
 
     // Swipe: horizontal movement >50px, more horizontal than vertical
     if (absDx > 50 && absDx > absDy * 1.5) {
@@ -1573,6 +1754,18 @@
   })
   document.addEventListener('mousemove', e => onGestureMove(e.clientX, e.clientY))
   document.addEventListener('dragstart', e => e.preventDefault())
+
+  // Swipe-up on dashboard → close
+  let dbSwipeStart = null
+  dashboardEl.addEventListener('touchstart', e => {
+    dbSwipeStart = { y: e.touches[0].clientY }
+  }, { passive: true })
+  dashboardEl.addEventListener('touchend', e => {
+    if (!dbSwipeStart) return
+    const dy = e.changedTouches[0].clientY - dbSwipeStart.y
+    dbSwipeStart = null
+    if (dy < -60) closeDashboard()
+  })
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -1786,6 +1979,9 @@
       } else if (msg.type === 'remote-settings') {
         if (!overlay.classList.contains('open')) openSettings()
         else { closeSettings(); if (!isPaused) resumeSlideshow() }
+      } else if (msg.type === 'remote-dashboard') {
+        if (dashboardOpen) closeDashboard()
+        else openDashboard()
       }
     })
 

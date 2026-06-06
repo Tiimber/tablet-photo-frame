@@ -487,6 +487,20 @@ app.post('/api/remote/settings', (req, res) => {
   res.json({ ok: true })
 })
 
+// Dashboard toggle — callable from HA rest_command
+app.post('/api/remote/dashboard', (req, res) => {
+  broadcast({ type: 'remote-dashboard' })
+  res.json({ ok: true })
+})
+
+// Dashboard shortcut — placeholder, wire up HA actions here
+app.post('/api/dashboard/shortcut', express.json(), (req, res) => {
+  const { action } = req.body || {}
+  console.log('[dashboard] shortcut:', action)
+  // TODO: forward to HA service call based on action
+  res.json({ ok: true, action })
+})
+
 // Queue status endpoint — polled by manage.html as fallback
 app.get('/api/queue', (req, res) => {
   res.json(queue.map(({ id, outName, thumbName, status, error, progress }) =>
