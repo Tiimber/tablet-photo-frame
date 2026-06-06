@@ -1867,6 +1867,20 @@
         lbl.textContent = y
         svg.appendChild(lbl)
       }
+      // vertical lines: hourly + midnight marker
+      slots.forEach((s, i) => {
+        const d = new Date(s.t)
+        const mins = d.getMinutes()
+        if (mins !== 0) return  // only on the hour
+        const isMidnight = d.getHours() === 0
+        const x = px(i).toFixed(1)
+        const vl = document.createElementNS('http://www.w3.org/2000/svg','line')
+        vl.setAttribute('x1', x); vl.setAttribute('x2', x)
+        vl.setAttribute('y1', '0'); vl.setAttribute('y2', H)
+        vl.setAttribute('stroke', isMidnight ? '#555' : '#2e2e2e')
+        vl.setAttribute('stroke-width', isMidnight ? '2' : '1')
+        svg.appendChild(vl)
+      })
       // color-coded path segments (bridge across color changes)
       const segPaths = {}
       vals.forEach((v, i) => {
