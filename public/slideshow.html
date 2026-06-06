@@ -2132,7 +2132,7 @@
       } else if (msg.type === 'remote-toggle-pause') {
         tapPause()
       } else if (msg.type === 'remote-settings') {
-        if (dashboardOpen) { closeDashboard() }
+        if (dashboardOpen) { /* ignore */ }
         else if (!overlay.classList.contains('open')) openSettings()
         else { closeSettings(); if (!isPaused) resumeSlideshow() }
       } else if (msg.type === 'remote-dashboard') {
