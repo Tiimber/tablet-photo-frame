@@ -40,17 +40,19 @@ const serverConfig = loadServerConfig()
 // Environment variable overrides
 if (process.env.PORT) serverConfig.port = parseInt(process.env.PORT, 10)
 
-const app         = express()
-const PHOTOS_DIR  = path.join(__dirname, serverConfig.paths.photos)
-const PUBLIC_DIR  = path.join(__dirname, serverConfig.paths.public)
-const PENDING_DIR = path.join(__dirname, serverConfig.paths.pending)
-const THUMBS_DIR  = path.join(__dirname, serverConfig.paths.thumbs)
-const CONFIG_FILE = path.join(__dirname, 'config.json')
-const META_FILE   = path.join(__dirname, 'meta.json')
+const app          = express()
+const PHOTOS_DIR   = path.join(__dirname, serverConfig.paths.photos)
+const PUBLIC_DIR   = path.join(__dirname, serverConfig.paths.public)
+const PENDING_DIR  = path.join(__dirname, serverConfig.paths.pending)
+const THUMBS_DIR   = path.join(__dirname, serverConfig.paths.thumbs)
+const POSTERS_DIR  = path.join(__dirname, serverConfig.paths.posters || './posters')
+const CONFIG_FILE  = path.join(__dirname, 'config.json')
+const META_FILE    = path.join(__dirname, 'meta.json')
 
 fs.mkdirSync(PHOTOS_DIR,  { recursive: true })
 fs.mkdirSync(PENDING_DIR, { recursive: true })
 fs.mkdirSync(THUMBS_DIR,  { recursive: true })
+fs.mkdirSync(POSTERS_DIR, { recursive: true })
 
 function loadMeta() {
   try { return JSON.parse(fs.readFileSync(META_FILE, 'utf8')) }
@@ -111,6 +113,23 @@ function generateThumb(origPath, thumbName) {
                   '-y', outPath]]
     : ['convert', [origPath + '[0]', '-auto-orient', '-thumbnail', '400x400>', outPath]]
   const proc = spawn(bin, args, { stdio: 'ignore' })
+  proc.on('close', code => { if (code !== 0) try { fs.unlinkSync(outPath) } catch {} })
+}
+
+/**
+ * Generate a full-resolution first-frame JPEG poster for a video.
+ * Stored in POSTERS_DIR as <basename>.jpg (e.g. myvideo.mp4 → myvideo.jpg).
+ * Fire-and-forget — errors are silently ignored.
+ */
+function generatePoster(videoPath, posterName) {
+  const outPath = path.join(POSTERS_DIR, posterName)
+  const proc = spawn('ffmpeg', [
+    '-ss', '0', '-i', videoPath,
+    '-frames:v', '1',
+    '-vf', 'scale=iw:ih',   // keep original resolution
+    '-q:v', '2',            // high quality JPEG
+    '-y', outPath
+  ], { stdio: 'ignore' })
   proc.on('close', code => { if (code !== 0) try { fs.unlinkSync(outPath) } catch {} })
 }
 
@@ -179,6 +198,11 @@ function processQueue() {
 
     // Generate thumb now (not at enqueue), so thumb processes are staggered
     generateThumb(next.origPath, next.thumbName)
+    // Generate poster (first-frame JPEG) for videos
+    if (next.isVideo) {
+      const posterName = path.basename(next.outName, path.extname(next.outName)) + '.jpg'
+      generatePoster(next.origPath, posterName)
+    }
 
     const outPath = path.join(PHOTOS_DIR, next.outName)
 
@@ -299,8 +323,9 @@ const upload = multer({
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 app.use(express.json())
-app.use('/photos', express.static(PHOTOS_DIR))
-app.use('/thumbs', express.static(THUMBS_DIR))
+app.use('/photos',  express.static(PHOTOS_DIR))
+app.use('/thumbs',  express.static(THUMBS_DIR))
+app.use('/posters', express.static(POSTERS_DIR))
 app.use(express.static(PUBLIC_DIR))
 
 app.get('/',          (req, res) => res.redirect('/slideshow'))
@@ -487,6 +512,17 @@ app.get('/api/version', (req, res) => {
   res.json({ commit: hash })
 })
 
+// Return the poster (first-frame JPEG) path for a video, or 404 if not yet generated
+app.get('/api/photos/:filename/poster', (req, res) => {
+  const filename   = path.basename(req.params.filename)
+  const ext        = path.extname(filename).toLowerCase()
+  if (!VIDEO_EXTS.has(ext)) return res.status(400).json({ error: 'Not a video' })
+  const posterName = path.basename(filename, ext) + '.jpg'
+  const posterPath = path.join(POSTERS_DIR, posterName)
+  if (!fs.existsSync(posterPath)) return res.status(404).json({ error: 'Poster not found' })
+  res.sendFile(posterPath)
+})
+
 app.get('/api/photos/:filename/info', (req, res) => {
   const filename = path.basename(req.params.filename)
   const filePath = path.join(PHOTOS_DIR, filename)
@@ -532,13 +568,19 @@ app.patch('/api/meta/:filename', (req, res) => {
 app.delete('/api/photos/:filename', (req, res) => {
   const filename = path.basename(req.params.filename)
   const filePath = path.join(PHOTOS_DIR, filename)
-  if (!MEDIA_EXTS.has(path.extname(filename).toLowerCase())) {
+  const ext      = path.extname(filename).toLowerCase()
+  if (!MEDIA_EXTS.has(ext)) {
     return res.status(400).json({ error: 'Unsupported file type' })
   }
   try {
     fs.unlinkSync(filePath)
     const meta = loadMeta()
     if (meta[filename]) { delete meta[filename]; saveMeta(meta) }
+    // Clean up poster for videos
+    if (VIDEO_EXTS.has(ext)) {
+      const posterName = path.basename(filename, ext) + '.jpg'
+      try { fs.unlinkSync(path.join(POSTERS_DIR, posterName)) } catch {}
+    }
     // Notify all clients that a file was deleted
     broadcast({ type: 'photo-deleted', filename })
     res.json({ ok: true })
