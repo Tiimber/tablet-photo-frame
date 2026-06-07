@@ -15,8 +15,9 @@
         /* ── Light popup ── */
         #lp-backdrop { display: none; position: absolute; inset: 0; z-index: 200; pointer-events: none; }
         #lp-backdrop.open { display: block; }
-        #lp-popup {
-            position: absolute; z-index: 201; min-width: 220px; max-width: 280px;
+        #lp-popup { display: none; }
+        #lp-popup.open {
+            display: block; position: absolute; z-index: 201; min-width: 220px; max-width: 280px;
             background: #1c1c1e; border: 1px solid #333; border-radius: 16px;
             padding: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.7);
             backdrop-filter: blur(16px);
@@ -575,11 +576,13 @@
 
         function lpOpen(entityId, label, isSwitch, px, py) {
             popupEntityId = entityId;
-            popupLabel = label;
+            // Strip "Room name - " prefix if present
+            popupLabel = label.includes(' - ') ? label.split(' - ').slice(1).join(' - ') : label;
             popupIsSwitch = isSwitch;
             const backdrop = document.getElementById('lp-backdrop');
             const popup = document.getElementById('lp-popup');
             backdrop.classList.add('open');
+            popup.classList.add('open');
             lpRenderPopup();
             const cw = 850, ch = 1095, pw = 280, ph = 240;
             let x = Math.min(px + 10, cw - pw - 10);
@@ -592,8 +595,10 @@
 
         function lpClose() {
             popupEntityId = null;
+            const popup = document.getElementById('lp-popup');
             document.getElementById('lp-backdrop').classList.remove('open');
-            document.getElementById('lp-popup').innerHTML = '';
+            popup.classList.remove('open');
+            popup.innerHTML = '';
         }
 
         function lpToggle(id) {
