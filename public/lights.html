@@ -704,16 +704,31 @@
         let didHold = false;
         const HOLD_MS = 350;
 
+        // Screen-space hit test: project each bead world pos to screen, check pixel distance
+        const _beadWorldPos = new THREE.Vector3();
+        const _beadNDC = new THREE.Vector3();
+        const BEAD_HIT_RADIUS_PX = 26; // half of 44px + small margin
+
         function resolveHitGroup(event) {
             const rect = renderer.domElement.getBoundingClientRect();
-            const mouse = new THREE.Vector2(
-                ((event.clientX - rect.left) / rect.width) * 2 - 1,
-                -(((event.clientY - rect.top) / rect.height) * 2 - 1)
-            );
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(clickableBeadObjects);
-            return intersects.length > 0 ? intersects[0].object.userData.parentGroup : null;
+            const scaleX = rect.width / 850;
+            const scaleY = rect.height / 1095;
+            const cx = event.clientX - rect.left;
+            const cy = event.clientY - rect.top;
+            let bestGroup = null, bestDist = Infinity;
+            for (const mesh of clickableBeadObjects) {
+                _beadWorldPos.setFromMatrixPosition(mesh.matrixWorld);
+                _beadNDC.copy(_beadWorldPos).project(camera);
+                if (_beadNDC.z > 1) continue; // behind camera
+                const sx = (_beadNDC.x * 0.5 + 0.5) * 850 * scaleX;
+                const sy = (-_beadNDC.y * 0.5 + 0.5) * 1095 * scaleY;
+                const dist = Math.sqrt((cx - sx) ** 2 + (cy - sy) ** 2);
+                if (dist < BEAD_HIT_RADIUS_PX * scaleX && dist < bestDist) {
+                    bestDist = dist;
+                    bestGroup = mesh.userData.parentGroup;
+                }
+            }
+            return bestGroup;
         }
 
         function groupToEntityInfo(parentGroup) {
