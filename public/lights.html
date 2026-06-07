@@ -700,6 +700,7 @@
         let holdTimer = null;
         let pointerDownTime = 0;
         let pointerDownPos = { x: 0, y: 0 };
+        let pointerDownGroup = null; // store hit group at pointerdown to reuse in pointerup
         let didHold = false;
         const HOLD_MS = 350;
 
@@ -737,11 +738,11 @@
             pointerDownTime = Date.now();
             pointerDownPos = { x: event.clientX, y: event.clientY };
             didHold = false;
-            const parentGroup = resolveHitGroup(event);
-            if (!parentGroup) return;
+            pointerDownGroup = resolveHitGroup(event);
+            if (!pointerDownGroup) return;
             holdTimer = setTimeout(() => {
                 didHold = true;
-                const info = groupToEntityInfo(parentGroup);
+                const info = groupToEntityInfo(pointerDownGroup);
                 if (!info) return;
                 const pos = clientToContainer(pointerDownPos.x, pointerDownPos.y);
                 lpOpen(info.entityId, info.label, info.isSwitch, pos.x, pos.y);
@@ -754,7 +755,7 @@
             const elapsed = Date.now() - pointerDownTime;
             const dx = event.clientX - pointerDownPos.x, dy = event.clientY - pointerDownPos.y;
             if (elapsed > 500 || Math.sqrt(dx*dx+dy*dy) > 10) return;
-            const parentGroup = resolveHitGroup(event);
+            const parentGroup = pointerDownGroup; // use stored group, not a new raycast
             if (!parentGroup) return;
             const info = groupToEntityInfo(parentGroup);
             if (!info) return;
@@ -767,9 +768,14 @@
         });
 
         renderer.domElement.addEventListener('pointermove', (event) => {
-            if (!holdTimer) return;
-            const dx = event.clientX - pointerDownPos.x, dy = event.clientY - pointerDownPos.y;
-            if (Math.sqrt(dx*dx+dy*dy) > 8) { clearTimeout(holdTimer); holdTimer = null; }
+            // Cancel hold if moved too far
+            if (holdTimer) {
+                const dx = event.clientX - pointerDownPos.x, dy = event.clientY - pointerDownPos.y;
+                if (Math.sqrt(dx*dx+dy*dy) > 8) { clearTimeout(holdTimer); holdTimer = null; }
+            }
+            // Cursor feedback
+            const hit = resolveHitGroup(event);
+            renderer.domElement.style.cursor = hit ? 'pointer' : 'default';
         });
 
         document.getElementById('btn-top').addEventListener('click', () => {
