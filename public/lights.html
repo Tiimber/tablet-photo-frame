@@ -582,10 +582,16 @@
                     targetGroup.add(light3d);
                     // Glow sprites along strip
                     if (!cfgToGlowSprites[cfg.name]) cfgToGlowSprites[cfg.name] = [];
-                    const stepX = Math.cos(lParams.yawRad || 0), stepZ = Math.sin(lParams.yawRad || 0);
+                    // ledParams.yawRad is the strip orientation in degrees (despite the name)
+                    // -90° yaw = strip runs along X axis (cos(-90°+90°)=cos(0)=1 in Three.js convention)
+                    // Use pitchRad to determine if horizontal (pitchRad=-90 → flat/horizontal strip)
+                    // Direction: yawRad=-90 means pointing along -X in standard math, but visually these
+                    // strips run along the room's long axis (X). Derive from actual coords difference.
+                    const yawR = ((lParams.yawRad || 0) + 90) * Math.PI / 180;
+                    const stepX = Math.cos(yawR), stepZ = Math.sin(yawR);
                     const count = Math.floor(lParams.length / lParams.spacing);
                     for (let i = 0; i <= count; i++) {
-                        const t = i / count;
+                        const t = i / count - 0.5; // center strip on coords
                         const sx = cfg.coords.x + stepX * lParams.length * t;
                         const sz = cfg.coords.z + stepZ * lParams.length * t;
                         const ledGlowMat = new THREE.SpriteMaterial({ map: glowTexture, color: 0xffe0a3, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending });
