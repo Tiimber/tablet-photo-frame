@@ -11,6 +11,41 @@
         .floor-btn { padding: 12px 24px; background: #2c2c2e; color: #e5e5ea; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; text-align: center; width: 150px; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); }
         .floor-btn.active { background: #00ff00; color: #000; box-shadow: 0 0 15px rgba(0,255,0,0.3); }
         .astro-readout { position: absolute; bottom: 25px; left: 25px; font-family: monospace; font-size: 11px; color: #666; background: rgba(10,10,10,0.6); padding: 6px 12px; border-radius: 6px; pointer-events: none; z-index: 100; border: 1px solid #222; }
+
+        /* ── Light popup ── */
+        #lp-backdrop { display: none; position: absolute; inset: 0; z-index: 200; }
+        #lp-backdrop.open { display: block; }
+        #lp-popup {
+            position: absolute; z-index: 201; min-width: 220px; max-width: 280px;
+            background: #1c1c1e; border: 1px solid #333; border-radius: 16px;
+            padding: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+            backdrop-filter: blur(16px);
+        }
+        .lp-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .lp-name { font-size: 0.95rem; font-weight: 600; color: #ddd; flex: 1; }
+        .lp-close { background: none; border: none; color: #555; font-size: 1.2rem; cursor: pointer; padding: 0 2px; line-height: 1; }
+        .lp-toggle {
+            width: 44px; height: 26px; border-radius: 13px; border: none;
+            background: #333; position: relative; cursor: pointer; flex-shrink: 0;
+            transition: background 0.2s;
+        }
+        .lp-toggle::after {
+            content: ''; position: absolute; top: 3px; left: 3px;
+            width: 20px; height: 20px; border-radius: 50%; background: #666;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .lp-toggle.lp-on { background: #c8922a; }
+        .lp-toggle.lp-on::after { transform: translateX(18px); background: #fff; }
+        .lp-sliders { display: flex; flex-direction: column; gap: 10px; }
+        .lp-slider-row { display: flex; align-items: center; gap: 8px; }
+        .lp-slider-label { font-size: 0.62rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; width: 68px; flex-shrink: 0; }
+        .lp-slider {
+            flex: 1; -webkit-appearance: none; appearance: none;
+            height: 4px; border-radius: 2px; outline: none; cursor: pointer; background: #333;
+        }
+        .lp-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #c8922a; cursor: pointer; border: none; }
+        .lp-slider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #c8922a; cursor: pointer; border: none; }
+        .lp-slider-val { font-size: 0.7rem; color: #666; width: 32px; text-align: right; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -20,6 +55,8 @@
             <button class="floor-btn active" id="btn-bottom">Bottom Floor</button>
         </div>
         <div class="astro-readout" id="astro-status">Astro-Dimmer Engine: Syncing...</div>
+        <div id="lp-backdrop"></div>
+        <div id="lp-popup"></div>
     </div>
 
     <script type="importmap">
@@ -223,6 +260,7 @@
                     if (st) haStates[id] = st;
                 }
                 applyAllHAStates();
+                if (popupEntityId) lpRenderPopup();
             } catch(e) { /* silent */ }
         }
 
@@ -455,44 +493,229 @@
             applyFloorVisibilityPipeline();
         }
 
-        // ── Click handler ────────────────────────────────────────────────────────
+        // ── Popup system ─────────────────────────────────────────────────────────
 
-        renderer.domElement.addEventListener('pointerdown', (event) => {
+        let popupEntityId = null;
+        let popupLabel = null;
+        let popupIsSwitch = false;
+
+        function lpIsOn(id)    { return haStates[id]?.state === 'on'; }
+        function lpBrightPct(id) { const b = haStates[id]?.attributes?.brightness; return b != null ? Math.round(b/255*100) : null; }
+        function lpColorTemp(id) { return haStates[id]?.attributes?.color_temp ?? null; }
+        function lpColorTempRange(id) {
+            const a = haStates[id]?.attributes || {};
+            return { min: a.min_mireds ?? 153, max: a.max_mireds ?? 500 };
+        }
+        function lpSupportsColorTemp(id) {
+            const modes = haStates[id]?.attributes?.supported_color_modes || [];
+            return modes.includes('color_temp');
+        }
+        function lpSupportsColor(id) {
+            const modes = haStates[id]?.attributes?.supported_color_modes || [];
+            return modes.includes('hs') || modes.includes('rgb') || modes.includes('xy') || modes.includes('rgbw') || modes.includes('rgbww');
+        }
+
+        function lpRenderPopup() {
+            if (!popupEntityId) return;
+            const id = popupEntityId;
+            const on = lpIsOn(id);
+            const sw = popupIsSwitch;
+            const bPct = lpBrightPct(id);
+            const ct = lpColorTemp(id);
+            const ctr = lpColorTempRange(id);
+            const hasCT = !sw && lpSupportsColorTemp(id);
+            const hasColor = !sw && lpSupportsColor(id);
+            const eid2 = id.replace(/[.\-]/g, '_');
+
+            let sliders = '';
+            if (!sw && on) {
+                if (bPct !== null) {
+                    sliders += `<div class="lp-slider-row">
+                        <div class="lp-slider-label">Brightness</div>
+                        <input type="range" class="lp-slider" min="1" max="100" value="${bPct}"
+                            oninput="this.nextElementSibling.textContent=this.value+'%'"
+                            onchange="lpSetBrightness('${id}',+this.value)">
+                        <div class="lp-slider-val">${bPct}%</div></div>`;
+                }
+                if (hasCT && ct !== null) {
+                    sliders += `<div class="lp-slider-row">
+                        <div class="lp-slider-label">Temp</div>
+                        <input type="range" class="lp-slider" min="${ctr.min}" max="${ctr.max}" value="${ct}"
+                            oninput="this.nextElementSibling.textContent=this.value"
+                            onchange="lpSetColorTemp('${id}',+this.value)">
+                        <div class="lp-slider-val">${ct}</div></div>`;
+                }
+                if (hasColor) {
+                    const hsArr = haStates[id]?.attributes?.hs_color || [0,100];
+                    const curH = Math.round(hsArr[0]), curS = Math.round(hsArr[1]);
+                    sliders += `<div class="lp-slider-row">
+                        <div class="lp-slider-label">Hue</div>
+                        <input type="range" class="lp-slider" id="lph_${eid2}" min="0" max="360" value="${curH}"
+                            style="background:linear-gradient(to right,hsl(0,100%,50%),hsl(60,100%,50%),hsl(120,100%,50%),hsl(180,100%,50%),hsl(240,100%,50%),hsl(300,100%,50%),hsl(360,100%,50%))"
+                            oninput="this.nextElementSibling.textContent=this.value+'°'"
+                            onchange="lpSetColor('${id}',+this.value,+(document.getElementById('lps_${eid2}')||{value:${curS}}).value)">
+                        <div class="lp-slider-val">${curH}°</div></div>`;
+                    sliders += `<div class="lp-slider-row">
+                        <div class="lp-slider-label">Saturation</div>
+                        <input type="range" class="lp-slider" id="lps_${eid2}" min="0" max="100" value="${curS}"
+                            oninput="this.nextElementSibling.textContent=this.value+'%'"
+                            onchange="lpSetColor('${id}',+(document.getElementById('lph_${eid2}')||{value:${curH}}).value,+this.value)">
+                        <div class="lp-slider-val">${curS}%</div></div>`;
+                }
+            }
+
+            document.getElementById('lp-popup').innerHTML = `
+                <div class="lp-header">
+                    <div class="lp-name">${popupLabel}</div>
+                    <button class="lp-toggle${on ? ' lp-on' : ''}" onclick="lpToggle('${id}')"></button>
+                    <button class="lp-close" onclick="lpClose()">✕</button>
+                </div>
+                ${sliders ? `<div class="lp-sliders">${sliders}</div>` : ''}`;
+        }
+
+        function lpOpen(entityId, label, isSwitch, px, py) {
+            popupEntityId = entityId;
+            popupLabel = label;
+            popupIsSwitch = isSwitch;
+            const backdrop = document.getElementById('lp-backdrop');
+            const popup = document.getElementById('lp-popup');
+            backdrop.classList.add('open');
+            lpRenderPopup();
+            const cw = 850, ch = 1095, pw = 280, ph = 240;
+            let x = Math.min(px + 10, cw - pw - 10);
+            let y = Math.min(py + 10, ch - ph - 10);
+            if (x < 10) x = 10;
+            if (y < 10) y = 10;
+            popup.style.left = x + 'px';
+            popup.style.top = y + 'px';
+        }
+
+        function lpClose() {
+            popupEntityId = null;
+            document.getElementById('lp-backdrop').classList.remove('open');
+            document.getElementById('lp-popup').innerHTML = '';
+        }
+
+        function lpToggle(id) {
+            const newOn = !lpIsOn(id);
+            if (!haStates[id]) haStates[id] = { state: 'off', attributes: {} };
+            haStates[id].state = newOn ? 'on' : 'off';
+            applyAllHAStates(); lpRenderPopup();
+            const domain = id.startsWith('switch.') ? 'switch' : 'light';
+            fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain, service: newOn ? 'turn_on' : 'turn_off', data: { entity_id: id } }) });
+        }
+
+        function lpSetBrightness(id, pct) {
+            const brightness = Math.round(pct / 100 * 255);
+            if (!haStates[id]) haStates[id] = { state: 'on', attributes: {} };
+            haStates[id].state = 'on';
+            haStates[id].attributes = haStates[id].attributes || {};
+            haStates[id].attributes.brightness = brightness;
+            applyAllHAStates();
+            fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain: 'light', service: 'turn_on', data: { entity_id: id, brightness } }) });
+        }
+
+        function lpSetColorTemp(id, mireds) {
+            if (!haStates[id]) haStates[id] = { state: 'on', attributes: {} };
+            haStates[id].attributes = haStates[id].attributes || {};
+            haStates[id].attributes.color_temp = mireds;
+            applyAllHAStates();
+            fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain: 'light', service: 'turn_on', data: { entity_id: id, color_temp: mireds } }) });
+        }
+
+        function lpSetColor(id, hue, sat) {
+            if (!haStates[id]) haStates[id] = { state: 'on', attributes: {} };
+            haStates[id].attributes = haStates[id].attributes || {};
+            haStates[id].attributes.hs_color = [hue, sat];
+            applyAllHAStates();
+            fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain: 'light', service: 'turn_on', data: { entity_id: id, hs_color: [hue, sat] } }) });
+        }
+
+        document.getElementById('lp-backdrop').addEventListener('pointerdown', (e) => {
+            const popup = document.getElementById('lp-popup');
+            const rect = popup.getBoundingClientRect();
+            if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) lpClose();
+        });
+
+        // ── Tap / hold handler ────────────────────────────────────────────────────
+
+        let holdTimer = null;
+        let pointerDownTime = 0;
+        let pointerDownPos = { x: 0, y: 0 };
+        let didHold = false;
+        const HOLD_MS = 350;
+
+        function resolveHitGroup(event) {
             const rect = renderer.domElement.getBoundingClientRect();
             const mouse = new THREE.Vector2(
                 ((event.clientX - rect.left) / rect.width) * 2 - 1,
-                -((event.clientY - rect.top) / rect.height) * 2 + 1
+                -(((event.clientY - rect.top) / rect.height) * 2 - 1)
             );
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(clickableBeadObjects);
-            if (intersects.length > 0) {
-                const parentGroup = intersects[0].object.userData.parentGroup;
-                if (parentGroup.userData.isBathroomMaster) {
-                    const cfgs = parentGroup.userData.childConfigs;
-                    const entityId = cfgs[0]?._entityId;
-                    if (entityId) {
-                        const isOn = haStates[entityId]?.state === 'on';
-                        const newOn = !isOn;
-                        if (haStates[entityId]) haStates[entityId].state = newOn ? 'on' : 'off';
-                        applyAllHAStates();
-                        fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ domain: 'light', service: newOn ? 'turn_on' : 'turn_off', data: { entity_id: entityId } }) });
-                    }
-                } else {
-                    const cfg = parentGroup.userData.configRef;
-                    if (cfg && cfg._entityId) {
-                        const isOn = haStates[cfg._entityId]?.state === 'on';
-                        const newOn = !isOn;
-                        if (!haStates[cfg._entityId]) haStates[cfg._entityId] = { state: 'off', attributes: {} };
-                        haStates[cfg._entityId].state = newOn ? 'on' : 'off';
-                        applyAllHAStates();
-                        const domain = cfg._entityId.startsWith('switch.') ? 'switch' : 'light';
-                        fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ domain, service: newOn ? 'turn_on' : 'turn_off', data: { entity_id: cfg._entityId } }) });
-                    }
-                }
+            return intersects.length > 0 ? intersects[0].object.userData.parentGroup : null;
+        }
+
+        function groupToEntityInfo(parentGroup) {
+            if (parentGroup.userData.isBathroomMaster) {
+                const cfgs = parentGroup.userData.childConfigs;
+                const entityId = cfgs[0]?._entityId;
+                return entityId ? { entityId, label: 'Bathroom', isSwitch: false } : null;
             }
+            const cfg = parentGroup.userData.configRef;
+            if (!cfg || !cfg._entityId) return null;
+            return { entityId: cfg._entityId, label: cfg.name, isSwitch: cfg._entityId.startsWith('switch.') };
+        }
+
+        function clientToContainer(clientX, clientY) {
+            const cont = document.getElementById('dashboard-container');
+            const rect = cont.getBoundingClientRect();
+            return { x: (clientX - rect.left) * (850 / rect.width), y: (clientY - rect.top) * (1095 / rect.height) };
+        }
+
+        renderer.domElement.addEventListener('pointerdown', (event) => {
+            if (popupEntityId) return;
+            pointerDownTime = Date.now();
+            pointerDownPos = { x: event.clientX, y: event.clientY };
+            didHold = false;
+            const parentGroup = resolveHitGroup(event);
+            if (!parentGroup) return;
+            holdTimer = setTimeout(() => {
+                didHold = true;
+                const info = groupToEntityInfo(parentGroup);
+                if (!info) return;
+                const pos = clientToContainer(pointerDownPos.x, pointerDownPos.y);
+                lpOpen(info.entityId, info.label, info.isSwitch, pos.x, pos.y);
+            }, HOLD_MS);
+        });
+
+        renderer.domElement.addEventListener('pointerup', (event) => {
+            if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+            if (didHold || popupEntityId) return;
+            const elapsed = Date.now() - pointerDownTime;
+            const dx = event.clientX - pointerDownPos.x, dy = event.clientY - pointerDownPos.y;
+            if (elapsed > 500 || Math.sqrt(dx*dx+dy*dy) > 10) return;
+            const parentGroup = resolveHitGroup(event);
+            if (!parentGroup) return;
+            const info = groupToEntityInfo(parentGroup);
+            if (!info) return;
+            const newOn = !lpIsOn(info.entityId);
+            if (!haStates[info.entityId]) haStates[info.entityId] = { state: 'off', attributes: {} };
+            haStates[info.entityId].state = newOn ? 'on' : 'off';
+            applyAllHAStates();
+            fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain: info.isSwitch ? 'switch' : 'light', service: newOn ? 'turn_on' : 'turn_off', data: { entity_id: info.entityId } }) });
+        });
+
+        renderer.domElement.addEventListener('pointermove', (event) => {
+            if (!holdTimer) return;
+            const dx = event.clientX - pointerDownPos.x, dy = event.clientY - pointerDownPos.y;
+            if (Math.sqrt(dx*dx+dy*dy) > 8) { clearTimeout(holdTimer); holdTimer = null; }
         });
 
         document.getElementById('btn-top').addEventListener('click', () => {
