@@ -408,7 +408,7 @@
 
   .lx-sliders { display: flex; flex-direction: column; gap: 8px; }
   .lx-slider-row { display: flex; align-items: center; gap: 8px; }
-  .lx-slider-label { font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; width: 28px; flex-shrink: 0; }
+  .lx-slider-label { font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; width: 72px; flex-shrink: 0; }
   .lx-slider {
     flex: 1; -webkit-appearance: none; appearance: none;
     height: 4px; border-radius: 2px; outline: none; cursor: pointer;
@@ -2484,7 +2484,7 @@
       sliders = '<div class="lx-sliders">'
       if (bPct !== null) {
         sliders += `<div class="lx-slider-row">
-          <div class="lx-slider-label">Bri</div>
+          <div class="lx-slider-label">Brightness</div>
           <input type="range" class="lx-slider" min="1" max="100" value="${bPct}"
             oninput="this.nextElementSibling.textContent=this.value+'%'"
             onchange="lxSetBrightness('${id}',+this.value)">
@@ -2492,7 +2492,7 @@
       }
       if (hasCT && ct !== null) {
         sliders += `<div class="lx-slider-row">
-          <div class="lx-slider-label">Temp</div>
+          <div class="lx-slider-label">Temperature</div>
           <input type="range" class="lx-slider" min="${ctr.min}" max="${ctr.max}" value="${ct}"
             oninput="this.nextElementSibling.textContent=this.value"
             onchange="lxSetColorTemp('${id}',+this.value)">
@@ -2510,7 +2510,7 @@
             onchange="lxSetColor('${id}',+this.value,+(document.getElementById('lxs_${eid2}')||{value:${curS}}).value)">
           <div class="lx-slider-val">${curH}°</div></div>`
         sliders += `<div class="lx-slider-row">
-          <div class="lx-slider-label">Sat</div>
+          <div class="lx-slider-label">Saturation</div>
           <input type="range" class="lx-slider" id="lxs_${eid2}" min="0" max="100" value="${curS}"
             oninput="this.nextElementSibling.textContent=this.value+'%'"
             onchange="lxSetColor('${id}',+(document.getElementById('lxh_${eid2}')||{value:${curH}}).value,+this.value)">
