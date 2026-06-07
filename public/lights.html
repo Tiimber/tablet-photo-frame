@@ -75,7 +75,7 @@
         // ── Static 3D light config library ──────────────────────────────────────
         // "haKey" = room name fragment + light name fragment from lights.json (lowercase, used for matching)
         const HOME_LIGHTS_CONFIG_LIBRARY = [
-          { name: "Living room - rainbow light",      haRoom: "living room", haLight: "rainbow",    type: "point", maxIntensity: 0.50, floor: "bottom", coords: { x: 618.3, y: 167.0, z: 338.9 }, params: {}, nonInteractive: true, rainbow: true },
+          { name: "Living room - rainbow light",      haRoom: "living room", haLight: "rainbow",    type: "point", maxIntensity: 0.50, floor: "bottom", coords: { x: 618.3, y: 167.0, z: 338.9 }, params: {}, hardcodedEntityId: 'switch.rainbow_light_plug', rainbow: true },
           { name: "Living room - computer lights",    haRoom: "living room", haLight: "computer",   type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 532.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
           { name: "Living room - massage lights",     haRoom: "living room", haLight: "massage",    type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 166.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
           { name: "Kitchen - table light",            haRoom: "kitchen",     haLight: "table",      type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 465.0, y: 253.0, z: 40.2  }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
@@ -314,6 +314,15 @@
             entityToCfgs = {};
 
             for (const cfg of HOME_LIGHTS_CONFIG_LIBRARY) {
+                // Hardcoded entity bypass (e.g. switch plugs not in lights.json)
+                if (cfg.hardcodedEntityId) {
+                    cfg._entityId = cfg.hardcodedEntityId;
+                    cfg._defaultOn = false;
+                    if (!entityToCfgs[cfg.hardcodedEntityId]) entityToCfgs[cfg.hardcodedEntityId] = [];
+                    entityToCfgs[cfg.hardcodedEntityId].push(cfg);
+                    continue;
+                }
+
                 const rKey = cfg.haRoom.toLowerCase();
                 const lKey = cfg.haLight.toLowerCase();
 
@@ -475,20 +484,16 @@
                     targetGroup.userData = { configRef: cfg, floor: cfg.floor };
                     const pointGeo = new THREE.BufferGeometry();
                     pointGeo.setAttribute('position', new THREE.Float32BufferAttribute([cfg.coords.x, cfg.coords.y, cfg.coords.z], 3));
-                    if (cfg.nonInteractive) {
-                        // Dimmed, non-clickable bead with rainbow canvas texture
-                        const rainbowTex = createRainbowBeadTexture();
-                        const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: 36, sizeAttenuation: false, map: rainbowTex, transparent: true, opacity: 0.45, depthTest: false, depthWrite: false });
-                        const billboard = new THREE.Points(pointGeo, pointMat); billboard.renderOrder = 999;
-                        targetGroup.add(billboard);
-                    } else {
-                        const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
-                        hitBoxMesh.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); hitBoxMesh.userData = { parentGroup: targetGroup };
-                        targetGroup.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
-                        const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: 44, sizeAttenuation: false, map: dashedCircleTexture, transparent: true, depthTest: false, depthWrite: false });
-                        const billboard = new THREE.Points(pointGeo, pointMat); billboard.renderOrder = 999;
-                        targetGroup.add(billboard);
-                    }
+                    // Always add hitbox for interaction
+                    const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+                    hitBoxMesh.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); hitBoxMesh.userData = { parentGroup: targetGroup };
+                    targetGroup.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
+                    // Rainbow lights get rainbow bead texture; others get standard dashed circle
+                    const beadTex = cfg.rainbow ? createRainbowBeadTexture() : dashedCircleTexture;
+                    const beadSize = cfg.rainbow ? 44 : 44;
+                    const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: beadSize, sizeAttenuation: false, map: beadTex, transparent: true, depthTest: false, depthWrite: false });
+                    const billboard = new THREE.Points(pointGeo, pointMat); billboard.renderOrder = 999;
+                    targetGroup.add(billboard);
                     if (cfg.floor !== activeFloorMode) targetGroup.visible = false;
                     scene.add(targetGroup); compiledActiveSceneLights.push(targetGroup);
                 }
