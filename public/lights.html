@@ -580,6 +580,23 @@
                     light3d.position.set(cfg.coords.x, cfg.coords.y - 10, cfg.coords.z);
                     light3d.visible = false;
                     targetGroup.add(light3d);
+                    // Glow sprites along strip
+                    if (!cfgToGlowSprites[cfg.name]) cfgToGlowSprites[cfg.name] = [];
+                    const stepX = Math.cos(lParams.yawRad || 0), stepZ = Math.sin(lParams.yawRad || 0);
+                    const count = Math.floor(lParams.length / lParams.spacing);
+                    for (let i = 0; i <= count; i++) {
+                        const t = i / count;
+                        const sx = cfg.coords.x + stepX * lParams.length * t;
+                        const sz = cfg.coords.z + stepZ * lParams.length * t;
+                        const ledGlowMat = new THREE.SpriteMaterial({ map: glowTexture, color: 0xffe0a3, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending });
+                        const ledSprite = new THREE.Sprite(ledGlowMat);
+                        ledSprite.scale.set(60, 60, 1);
+                        ledSprite.position.set(sx, cfg.coords.y, sz);
+                        ledSprite.visible = false;
+                        ledSprite.renderOrder = 5;
+                        targetGroup.add(ledSprite);
+                        cfgToGlowSprites[cfg.name].push(ledSprite);
+                    }
                 }
 
                 if (light3d) {
