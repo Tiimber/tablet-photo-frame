@@ -89,7 +89,13 @@
         camera.position.set(290.4, 2076.3, 1439.5);
         camera.rotation.set(-0.9793, -0.0100, 0.0000, 'YXZ');
 
-        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        let renderer;
+        try {
+            renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        } catch(e) {
+            container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#555;font-family:system-ui;font-size:1rem;text-align:center;padding:40px">3D view unavailable<br><span style="font-size:0.75rem;color:#333;margin-top:8px;display:block">WebGL not supported on this device</span></div>';
+            throw e;
+        }
         renderer.setSize(850, 1095);
         renderer.localClippingEnabled = true;
         renderer.setPixelRatio(1.0);
