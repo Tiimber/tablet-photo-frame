@@ -113,6 +113,9 @@
         // rainbow light THREE.PointLight reference for animation
         let rainbowLight3d = null;
         let rainbowHue = 0;
+        // entity_id → timestamp of last optimistic toggle (suppress poll overwrite for 5s)
+        const optimisticLock = {};
+        const OPTIMISTIC_LOCK_MS = 5000;
 
         // ── Scene globals ────────────────────────────────────────────────────────
         let houseCutPlane, globalHouse, ambientLight, sunLight;
@@ -282,8 +285,11 @@
                 });
                 if (!r.ok) return;
                 const map = await r.json();
+                const now = Date.now();
                 for (const [id, st] of Object.entries(map)) {
-                    if (st) haStates[id] = st;
+                    if (st && !(optimisticLock[id] && now - optimisticLock[id] < OPTIMISTIC_LOCK_MS)) {
+                        haStates[id] = st;
+                    }
                 }
                 applyAllHAStates();
                 if (popupEntityId) lpRenderPopup();
@@ -447,8 +453,7 @@
                 if (secondFloorPlates.includes(node.name) || secondFloorWalls.includes(node.name)) node.visible = (activeFloorMode === 'top');
             });
             compiledActiveSceneLights.forEach(group => {
-                if (group.userData.floor !== activeFloorMode) { group.visible = false; }
-                else { group.visible = true; }
+                group.visible = (group.userData.floor === activeFloorMode);
             });
         }
 
@@ -643,6 +648,7 @@
             const newOn = !lpIsOn(id);
             if (!haStates[id]) haStates[id] = { state: 'off', attributes: {} };
             haStates[id].state = newOn ? 'on' : 'off';
+            optimisticLock[id] = Date.now();
             applyAllHAStates(); lpRenderPopup();
             const domain = id.startsWith('switch.') ? 'switch' : 'light';
             fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -655,6 +661,7 @@
             haStates[id].state = 'on';
             haStates[id].attributes = haStates[id].attributes || {};
             haStates[id].attributes.brightness = brightness;
+            optimisticLock[id] = Date.now();
             applyAllHAStates();
             fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ domain: 'light', service: 'turn_on', data: { entity_id: id, brightness } }) });
@@ -664,6 +671,7 @@
             if (!haStates[id]) haStates[id] = { state: 'on', attributes: {} };
             haStates[id].attributes = haStates[id].attributes || {};
             haStates[id].attributes.color_temp = mireds;
+            optimisticLock[id] = Date.now();
             applyAllHAStates();
             fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ domain: 'light', service: 'turn_on', data: { entity_id: id, color_temp: mireds } }) });
@@ -673,6 +681,7 @@
             if (!haStates[id]) haStates[id] = { state: 'on', attributes: {} };
             haStates[id].attributes = haStates[id].attributes || {};
             haStates[id].attributes.hs_color = [hue, sat];
+            optimisticLock[id] = Date.now();
             applyAllHAStates();
             fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ domain: 'light', service: 'turn_on', data: { entity_id: id, hs_color: [hue, sat] } }) });
@@ -775,6 +784,7 @@
             const newOn = !lpIsOn(info.entityId);
             if (!haStates[info.entityId]) haStates[info.entityId] = { state: 'off', attributes: {} };
             haStates[info.entityId].state = newOn ? 'on' : 'off';
+            optimisticLock[info.entityId] = Date.now();
             applyAllHAStates();
             fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ domain: info.isSwitch ? 'switch' : 'light', service: newOn ? 'turn_on' : 'turn_off', data: { entity_id: info.entityId } }) });
