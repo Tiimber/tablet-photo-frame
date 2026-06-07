@@ -67,6 +67,7 @@
         let targetPlaneHeight = 280;
         let currentBottomFloorOpacity = 0.0;
         let targetBottomFloorOpacity = 0.0;
+        const isMobile = window.matchMedia('(pointer: coarse)').matches;
         const animationSpeed = 0.07;
         let bottomFloorMeshesToFade = [];
         let compiledActiveSceneLights = [];
@@ -310,27 +311,40 @@
             if (frameDelta < fpsTargetBudget) return;
 
             if (houseCutPlane) {
-                const diffHeight = targetPlaneHeight - houseCutPlane.constant;
-                if (Math.abs(diffHeight) > 0.1) houseCutPlane.constant += diffHeight * animationSpeed;
-                else houseCutPlane.constant = targetPlaneHeight;
+                if (isMobile) {
+                    houseCutPlane.constant = targetPlaneHeight;
+                } else {
+                    const diffHeight = targetPlaneHeight - houseCutPlane.constant;
+                    if (Math.abs(diffHeight) > 0.1) houseCutPlane.constant += diffHeight * animationSpeed;
+                    else houseCutPlane.constant = targetPlaneHeight;
+                }
             }
 
             if (bottomFloorMeshesToFade.length > 0) {
-                const diffOpacity = targetBottomFloorOpacity - currentBottomFloorOpacity;
-                if (Math.abs(diffOpacity) > 0.01) {
-                    currentBottomFloorOpacity += diffOpacity * animationSpeed;
-                    bottomFloorMeshesToFade.forEach(mesh => {
-                        mesh.visible = true;
-                        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-                        mats.forEach(mat => { mat.transparent = true; mat.opacity = currentBottomFloorOpacity; });
-                    });
-                } else {
+                if (isMobile) {
                     currentBottomFloorOpacity = targetBottomFloorOpacity;
                     bottomFloorMeshesToFade.forEach(mesh => {
                         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
                         mats.forEach(mat => { mat.opacity = currentBottomFloorOpacity; mat.transparent = (currentBottomFloorOpacity < 1.0); });
                         mesh.visible = (currentBottomFloorOpacity > 0);
                     });
+                } else {
+                    const diffOpacity = targetBottomFloorOpacity - currentBottomFloorOpacity;
+                    if (Math.abs(diffOpacity) > 0.01) {
+                        currentBottomFloorOpacity += diffOpacity * animationSpeed;
+                        bottomFloorMeshesToFade.forEach(mesh => {
+                            mesh.visible = true;
+                            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                            mats.forEach(mat => { mat.transparent = true; mat.opacity = currentBottomFloorOpacity; });
+                        });
+                    } else {
+                        currentBottomFloorOpacity = targetBottomFloorOpacity;
+                        bottomFloorMeshesToFade.forEach(mesh => {
+                            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                            mats.forEach(mat => { mat.opacity = currentBottomFloorOpacity; mat.transparent = (currentBottomFloorOpacity < 1.0); });
+                            mesh.visible = (currentBottomFloorOpacity > 0);
+                        });
+                    }
                 }
             }
 
