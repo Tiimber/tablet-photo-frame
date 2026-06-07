@@ -488,10 +488,8 @@
                     const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(30, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
                     hitBoxMesh.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); hitBoxMesh.userData = { parentGroup: targetGroup };
                     targetGroup.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
-                    // Rainbow lights get rainbow bead texture; others get standard dashed circle
-                    const beadTex = cfg.rainbow ? createRainbowBeadTexture() : dashedCircleTexture;
-                    const beadSize = cfg.rainbow ? 44 : 44;
-                    const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: beadSize, sizeAttenuation: false, map: beadTex, transparent: true, depthTest: false, depthWrite: false });
+                    // All beads use the same dashed circle texture
+                    const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: 44, sizeAttenuation: false, map: dashedCircleTexture, transparent: true, depthTest: false, depthWrite: false });
                     const billboard = new THREE.Points(pointGeo, pointMat); billboard.renderOrder = 999;
                     targetGroup.add(billboard);
                     if (cfg.floor !== activeFloorMode) targetGroup.visible = false;
