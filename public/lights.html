@@ -576,8 +576,9 @@
 
         function lpOpen(entityId, label, isSwitch, px, py) {
             popupEntityId = entityId;
-            // Strip "Room name - " prefix if present
-            popupLabel = label.includes(' - ') ? label.split(' - ').slice(1).join(' - ') : label;
+            // Strip "Room name - " prefix, then title-case
+            const stripped = label.includes(' - ') ? label.split(' - ').slice(1).join(' - ') : label;
+            popupLabel = stripped.replace(/\b\w/g, c => c.toUpperCase());
             popupIsSwitch = isSwitch;
             const backdrop = document.getElementById('lp-backdrop');
             const popup = document.getElementById('lp-popup');
