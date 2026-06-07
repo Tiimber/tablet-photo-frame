@@ -86,7 +86,9 @@
     {
       "name": "Outdoors",
       "lights": [
-        { "entity_id": "light.entrance_lights", "name": "Entrance" }
+        { "entity_id": "light.entrance_lights", "name": "Entrance" },
+        { "entity_id": "light.entrance_left", "name": "Entrance Left" },
+        { "entity_id": "light.entrance_right", "name": "Entrance Right" }
       ]
     }
   ]

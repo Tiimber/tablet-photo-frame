@@ -10,6 +10,9 @@
         .floor-overlay { position: absolute; top: 25px; right: 25px; display: flex; flex-direction: column; gap: 10px; z-index: 100; background: rgba(20,20,20,0.75); padding: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
         .floor-btn { padding: 12px 24px; background: #2c2c2e; color: #e5e5ea; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; text-align: center; width: 150px; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); }
         .floor-btn.active { background: #00ff00; color: #000; box-shadow: 0 0 15px rgba(0,255,0,0.3); }
+        .all-off-btn { padding: 10px 24px; background: #3a1a1a; color: #ff6b6b; border: 1px solid #5a2a2a; border-radius: 8px; font-weight: bold; font-size: 12px; cursor: pointer; text-align: center; width: 150px; transition: all 0.25s; }
+        .all-off-btn:active { background: #5a2a2a; }
+        .all-off-btn.done { background: #1a3a1a; color: #6bff6b; border-color: #2a5a2a; }
         .astro-readout { position: absolute; bottom: 25px; left: 25px; font-family: monospace; font-size: 11px; color: #666; background: rgba(10,10,10,0.6); padding: 6px 12px; border-radius: 6px; pointer-events: none; z-index: 100; border: 1px solid #222; }
 
         /* ── Light popup ── */
@@ -54,6 +57,7 @@
         <div class="floor-overlay">
             <button class="floor-btn" id="btn-top">Top Floor</button>
             <button class="floor-btn active" id="btn-bottom">Bottom Floor</button>
+            <button class="all-off-btn" id="btn-all-off" onclick="allLightsOff()">💡 All lights off</button>
         </div>
         <div class="astro-readout" id="astro-status">Astro-Dimmer Engine: Syncing...</div>
         <div id="lp-backdrop"></div>
@@ -960,6 +964,20 @@
         }
         scaleContainer();
         window.addEventListener('resize', scaleContainer);
+
+        async function allLightsOff() {
+            const btn = document.getElementById('btn-all-off');
+            btn.disabled = true;
+            try {
+                await fetch('/api/ha-service', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domain: 'light', service: 'turn_off', data: { entity_id: 'all' } })
+                });
+                btn.classList.add('done');
+                btn.textContent = '✓ All off';
+                setTimeout(() => { btn.classList.remove('done'); btn.textContent = '💡 All lights off'; btn.disabled = false; }, 3000);
+            } catch { btn.disabled = false; }
+        }
     </script>
 </body>
 </html>
