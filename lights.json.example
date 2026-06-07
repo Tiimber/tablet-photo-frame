@@ -4,7 +4,8 @@
       "name": "Living room",
       "lights": [
         { "entity_id": "light.computer_lights", "name": "Computer" },
-        { "entity_id": "light.massage_chair_lights", "name": "Massage Chair" }
+        { "entity_id": "light.massage_chair_lights", "name": "Massage Chair" },
+        { "entity_id": "switch.rainbow_light_plug", "name": "Rainbow" }
       ]
     },
     {
