@@ -422,6 +422,31 @@
   }
   .lx-all-label { font-size: 0.85rem; color: #888; flex: 1; font-style: italic; }
 
+  /* Lights tab bar */
+  .lx-tab-bar {
+    display: flex; gap: 0; flex-shrink: 0;
+    border-bottom: 1px solid #222; margin-bottom: 12px;
+  }
+  .lx-tab {
+    flex: 1; padding: 8px 0; text-align: center;
+    font-size: 0.8rem; color: #555; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lx-tab.active { color: #c8922a; border-bottom-color: #c8922a; }
+  /* Map tab */
+  #lx-map-view {
+    display: none; flex: 1; overflow: hidden; position: relative;
+  }
+  #lx-map-view.active { display: flex; align-items: center; justify-content: center; }
+  #lx-map-img {
+    max-width: 100%; max-height: 100%; object-fit: contain;
+    border-radius: 8px; display: block;
+  }
+  /* Simple tab wrapper */
+  #lx-simple-view { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+  #lx-simple-view.hidden { display: none; }
+
   /* Shortcut card */
   .db-shortcut { cursor: pointer; transition: background 0.15s; align-items: center; }
   .db-shortcut:active { background: #252525; }
@@ -1012,20 +1037,32 @@
       </div>
 
       <!-- ── Screen 2: Lights ──────────────────────────────────────── -->
-      <div class="db-screen" id="db-screen-2">
-        <!-- Level 1: room list -->
-        <div id="lx-rooms-view">
-          <div class="db-screen-title">Lights</div>
-          <div id="lx-room-list"></div>
+      <div class="db-screen" id="db-screen-2" style="flex-direction:column;">
+        <div class="db-screen-title">Lights</div>
+        <!-- Tab bar -->
+        <div class="lx-tab-bar">
+          <div class="lx-tab active" id="lx-tab-simple" onclick="lxSetTab('simple')">Simple</div>
+          <div class="lx-tab" id="lx-tab-map" onclick="lxSetTab('map')">Map</div>
         </div>
-        <!-- Level 2: room detail (hidden until drill-down) -->
-        <div id="lx-detail-view" style="display:none; flex-direction:column; height:100%; gap:12px;">
-          <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
-            <button id="lx-back-btn" onclick="lxBack()" style="background:none;border:none;color:#888;font-size:1.5rem;cursor:pointer;padding:0 4px 0 0;line-height:1;">‹</button>
-            <div class="db-screen-title" id="lx-detail-title" style="margin:0;padding:0;"></div>
-            <button id="lx-detail-close" onclick="closeDashboard()" style="background:none;border:none;color:#555;font-size:1.4rem;cursor:pointer;margin-left:auto;line-height:1;">✕</button>
+        <!-- Simple tab -->
+        <div id="lx-simple-view">
+          <!-- Level 1: room list -->
+          <div id="lx-rooms-view">
+            <div id="lx-room-list"></div>
           </div>
-          <div id="lx-light-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:10px;"></div>
+          <!-- Level 2: room detail -->
+          <div id="lx-detail-view" style="display:none; flex-direction:column; height:100%; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+              <button id="lx-back-btn" onclick="lxBack()" style="background:none;border:none;color:#888;font-size:1.5rem;cursor:pointer;padding:0 4px 0 0;line-height:1;">‹</button>
+              <div class="db-screen-title" id="lx-detail-title" style="margin:0;padding:0;"></div>
+              <button id="lx-detail-close" onclick="closeDashboard()" style="background:none;border:none;color:#555;font-size:1.4rem;cursor:pointer;margin-left:auto;line-height:1;">✕</button>
+            </div>
+            <div id="lx-light-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:10px;"></div>
+          </div>
+        </div>
+        <!-- Map tab -->
+        <div id="lx-map-view">
+          <img id="lx-map-img" src="/house_map.png" alt="House map">
         </div>
       </div>
 
@@ -2461,6 +2498,21 @@
   window.lxOpenRoom     = lxOpenRoom
   window.lxBack         = lxBack
 
+  // ── Lights tab switching ─────────────────────────────────────────────────
+  let lxActiveTab = localStorage.getItem('lxTab') || 'simple'
+
+  function lxSetTab(tab) {
+    lxActiveTab = tab
+    localStorage.setItem('lxTab', tab)
+    document.getElementById('lx-tab-simple').classList.toggle('active', tab === 'simple')
+    document.getElementById('lx-tab-map').classList.toggle('active', tab === 'map')
+    document.getElementById('lx-simple-view').classList.toggle('hidden', tab !== 'simple')
+    document.getElementById('lx-map-view').classList.toggle('active', tab === 'map')
+    if (tab === 'simple') lxInit().then(() => lxRenderRooms())
+  }
+
+  window.lxSetTab = lxSetTab
+
   // ── Sensors screen ───────────────────────────────────────────────────────
   const SX_ROOMS = [
     { name: 'Living room',     temp: 'sensor.timmerflotte_temp_hmd_sensor_temperature_2', humid: 'sensor.timmerflotte_temp_hmd_sensor_humidity_2',
@@ -2901,7 +2953,7 @@
       orig(n, animate)
       const s = ((n % DB_SCREENS) + DB_SCREENS) % DB_SCREENS
       if (s === 1) dbLoadControlCenter()
-      if (s === 2) lxInit().then(() => lxRenderRooms())
+      if (s === 2) lxInit().then(() => lxSetTab(lxActiveTab))
       if (s === 3) dbLoadSensors()
       // Stop camera refresh when leaving screen 1
       if (s !== 1 && ccCamTimer) { clearInterval(ccCamTimer); ccCamTimer = null }
