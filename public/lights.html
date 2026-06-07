@@ -75,7 +75,7 @@
         // ── Static 3D light config library ──────────────────────────────────────
         // "haKey" = room name fragment + light name fragment from lights.json (lowercase, used for matching)
         const HOME_LIGHTS_CONFIG_LIBRARY = [
-          { name: "Living room - rainbow light",      haRoom: "living room", haLight: "rainbow",    type: "point", maxIntensity: 0.50, floor: "bottom", coords: { x: 618.3, y: 167.0, z: 338.9 }, params: {} },
+          { name: "Living room - rainbow light",      haRoom: "living room", haLight: "rainbow",    type: "point", maxIntensity: 0.50, floor: "bottom", coords: { x: 618.3, y: 167.0, z: 338.9 }, params: {}, nonInteractive: true, rainbow: true },
           { name: "Living room - computer lights",    haRoom: "living room", haLight: "computer",   type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 532.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
           { name: "Living room - massage lights",     haRoom: "living room", haLight: "massage",    type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 166.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
           { name: "Kitchen - table light",            haRoom: "kitchen",     haLight: "table",      type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 465.0, y: 253.0, z: 40.2  }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
@@ -110,6 +110,9 @@
         let entityToCfgs = {};
         // cfg.name → THREE light object(s)
         let cfgToLights = {};
+        // rainbow light THREE.PointLight reference for animation
+        let rainbowLight3d = null;
+        let rainbowHue = 0;
 
         // ── Scene globals ────────────────────────────────────────────────────────
         let houseCutPlane, globalHouse, ambientLight, sunLight;
@@ -158,6 +161,28 @@
         scene.add(sunLight);
 
         houseCutPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 280);
+
+        function createRainbowBeadTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 128, 128);
+            // Rainbow ring
+            const grad = ctx.createConicGradient(0, 64, 64);
+            grad.addColorStop(0,     'hsl(0,100%,55%)');
+            grad.addColorStop(1/6,   'hsl(60,100%,55%)');
+            grad.addColorStop(2/6,   'hsl(120,100%,55%)');
+            grad.addColorStop(3/6,   'hsl(180,100%,55%)');
+            grad.addColorStop(4/6,   'hsl(240,100%,55%)');
+            grad.addColorStop(5/6,   'hsl(300,100%,55%)');
+            grad.addColorStop(1,     'hsl(360,100%,55%)');
+            ctx.strokeStyle = grad; ctx.lineWidth = 10;
+            ctx.beginPath(); ctx.arc(64, 64, 54, 0, Math.PI * 2); ctx.stroke();
+            // Dark outline
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(64, 64, 54, 0, Math.PI * 2); ctx.stroke();
+            return new THREE.CanvasTexture(canvas);
+        }
 
         function createDashedCircleTexture() {
             const canvas = document.createElement('canvas');
@@ -229,7 +254,7 @@
             for (const lObj of lights3d) {
                 lObj.visible = isOn;
                 if (!isOn) continue;
-                lObj.color.copy(color);
+                if (!cfg.rainbow) lObj.color.copy(color); // rainbow color is driven by animation loop
                 if (cfg.type === 'point') {
                     lObj.intensity = cfg.maxIntensity * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
                 } else if (cfg.type === 'spot') {
@@ -448,14 +473,22 @@
                 } else {
                     targetGroup = new THREE.Group();
                     targetGroup.userData = { configRef: cfg, floor: cfg.floor };
-                    const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
-                    hitBoxMesh.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); hitBoxMesh.userData = { parentGroup: targetGroup };
-                    targetGroup.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
                     const pointGeo = new THREE.BufferGeometry();
                     pointGeo.setAttribute('position', new THREE.Float32BufferAttribute([cfg.coords.x, cfg.coords.y, cfg.coords.z], 3));
-                    const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: 44, sizeAttenuation: false, map: dashedCircleTexture, transparent: true, depthTest: false, depthWrite: false });
-                    const billboard = new THREE.Points(pointGeo, pointMat); billboard.renderOrder = 999;
-                    targetGroup.add(billboard);
+                    if (cfg.nonInteractive) {
+                        // Dimmed, non-clickable bead with rainbow canvas texture
+                        const rainbowTex = createRainbowBeadTexture();
+                        const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: 36, sizeAttenuation: false, map: rainbowTex, transparent: true, opacity: 0.45, depthTest: false, depthWrite: false });
+                        const billboard = new THREE.Points(pointGeo, pointMat); billboard.renderOrder = 999;
+                        targetGroup.add(billboard);
+                    } else {
+                        const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+                        hitBoxMesh.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); hitBoxMesh.userData = { parentGroup: targetGroup };
+                        targetGroup.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
+                        const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: 44, sizeAttenuation: false, map: dashedCircleTexture, transparent: true, depthTest: false, depthWrite: false });
+                        const billboard = new THREE.Points(pointGeo, pointMat); billboard.renderOrder = 999;
+                        targetGroup.add(billboard);
+                    }
                     if (cfg.floor !== activeFloorMode) targetGroup.visible = false;
                     scene.add(targetGroup); compiledActiveSceneLights.push(targetGroup);
                 }
@@ -467,6 +500,7 @@
                     light3d.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
                     light3d.visible = false;
                     targetGroup.add(light3d);
+                    if (cfg.rainbow) rainbowLight3d = light3d;
                 } else if (cfg.type === 'spot') {
                     const sParams = cfg.spotParams || { angle: 45, pitch: -90, yaw: 0 };
                     light3d = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 1.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sParams.angle * (Math.PI / 180), 0.5, 0);
@@ -756,6 +790,12 @@
             requestAnimationFrame(animate);
             frameDelta += clock.getDelta();
             if (frameDelta < fpsTargetBudget) return;
+
+            // Rainbow light hue cycling
+            if (rainbowLight3d && rainbowLight3d.visible) {
+                rainbowHue = (rainbowHue + 0.8) % 360;
+                rainbowLight3d.color.setHSL(rainbowHue / 360, 1.0, 0.5);
+            }
 
             if (houseCutPlane) {
                 if (isMobile) {
