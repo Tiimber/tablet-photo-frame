@@ -84,12 +84,9 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0c0c0d);
 
-        const camera = new THREE.PerspectiveCamera(50, 850 / 1095, 0.1, 10000);
-        camera.position.set(302.2, 2215.9, 1206.6);
-        camera.rotation.order = 'YXZ';
-        camera.rotation.x = -62.1 * (Math.PI / 180);
-        camera.rotation.y = -0.3 * (Math.PI / 180);
-        camera.rotation.z = -0.6 * (Math.PI / 180);
+		const camera = new THREE.PerspectiveCamera(50, 850 / 1095, 0.1, 10000);
+		camera.position.set(290.4, 2076.3, 1439.5);
+		camera.rotation.set(-0.9793, -0.0100, 0.0000, 'YXZ');
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(850, 1095);
