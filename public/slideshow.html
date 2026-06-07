@@ -456,10 +456,9 @@
   #lx-map-view {
     display: none; flex: 1; overflow: hidden; position: relative; min-height: 0;
   }
-  #lx-map-view.active { display: flex; align-items: center; justify-content: center; }
-  #lx-map-img {
-    max-width: 100%; max-height: 100%; object-fit: contain;
-    border-radius: 8px; display: block;
+  #lx-map-view.active { display: flex; flex-direction: column; }
+  #lx-map-view iframe {
+    width: 100%; flex: 1; border: none; display: block; background: #0b0b0b;
   }
   /* Simple tab wrapper */
   #lx-simple-view { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
@@ -1096,7 +1095,7 @@
           </div>
           <!-- Map tab -->
           <div id="lx-map-view">
-            <img id="lx-map-img" src="/house_map.png" alt="House map">
+            <iframe src="/lights.html"></iframe>
           </div>
         </div>
       </div>

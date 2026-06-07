@@ -703,88 +703,9 @@
       min-height: 44px;
     }
   }
-  /* Tab bar */
-  .tab-bar {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #2a2a2a;
-    padding-bottom: 0;
-  }
-  .tab-btn {
-    padding: 10px 22px;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: #888;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    letter-spacing: 0.04em;
-    transition: color 0.15s, border-color 0.15s;
-    margin-bottom: -1px;
-  }
-  .tab-btn.active { color: #fff; border-bottom-color: #4a9eff; }
-  .tab-btn:hover:not(.active) { color: #ccc; }
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
-
-  /* Lights tab */
-  #tab-lights {
-    display: none;
-    justify-content: center;
-    align-items: flex-start;
-    padding: 0;
-    margin: -24px -24px 0;
-    background: #0b0b0b;
-    min-height: calc(100vh - 60px);
-  }
-  #tab-lights.active { display: flex; }
-  #dashboard-container {
-    position: relative;
-    width: 850px;
-    height: 1095px;
-    background: #121212;
-    box-shadow: 0 25px 60px rgba(0,0,0,0.8);
-    border: 1px solid #222;
-    border-radius: 16px;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-  .floor-overlay {
-    position: absolute;
-    top: 25px; right: 25px;
-    display: flex; flex-direction: column; gap: 10px;
-    z-index: 100;
-    background: rgba(20,20,20,0.75);
-    padding: 8px; border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(12px);
-  }
-  .floor-btn {
-    padding: 12px 24px;
-    background: #2c2c2e; color: #e5e5ea;
-    border: none; border-radius: 8px;
-    font-weight: bold; font-size: 13px;
-    cursor: pointer; text-align: center; width: 150px;
-    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-  }
-  .floor-btn.active { background: #00ff00; color: #000; box-shadow: 0 0 15px rgba(0,255,0,0.3); }
-  .astro-readout {
-    position: absolute; bottom: 25px; left: 25px;
-    font-family: monospace; font-size: 11px; color: #666;
-    background: rgba(10,10,10,0.6); padding: 6px 12px;
-    border-radius: 6px; pointer-events: none; z-index: 100;
-    border: 1px solid #222;
-  }
 </style>
 </head>
 <body>
-<nav class="tab-bar">
-  <button class="tab-btn active" data-tab="tab-slideshow">📷 Slideshow</button>
-  <button class="tab-btn" data-tab="tab-lights">💡 Lights</button>
-</nav>
-<div id="tab-slideshow" class="tab-panel active">
 <h1>Slideshow Manager</h1>
 
 <button id="upload-toggle">Upload & Processing</button>
@@ -1967,23 +1888,6 @@
     }
   })
 
-  // Tab switching
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.tab;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(target).classList.add('active');
-    });
-  });
-
 </script>
-</div><!-- end tab-slideshow -->
-
-<div id="tab-lights" class="tab-panel">
-  <iframe src="/lights.html" style="width:100%;height:calc(100vh - 60px);border:none;display:block;background:#0b0b0b;"></iframe>
-</div>
-
 </body>
 </html>
