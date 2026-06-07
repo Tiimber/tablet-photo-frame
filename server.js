@@ -554,6 +554,24 @@ app.get('/api/lights/config', (req, res) => {
   catch { res.json({ rooms: [] }) }
 })
 
+// Batch HA states — POST { entities: [...] } → { entity_id: stateObj, ... }
+app.post('/api/ha-states-batch', express.json(), async (req, res) => {
+  const ha = loadHASync()
+  if (!ha || !ha.url || !ha.token) return res.status(503).json({ error: 'HA not configured' })
+  const { entities } = req.body || {}
+  if (!Array.isArray(entities) || entities.length === 0) return res.json({})
+  const base = ha.url.replace(/\/$/, '')
+  const headers = { 'Authorization': 'Bearer ' + ha.token }
+  try {
+    const results = await Promise.allSettled(
+      entities.map(e => fetch(`${base}/api/states/${e}`, { headers }).then(r => r.ok ? r.json() : null))
+    )
+    const map = {}
+    entities.forEach((e, i) => { map[e] = results[i].status === 'fulfilled' ? results[i].value : null })
+    res.json(map)
+  } catch(e) { res.status(502).json({ error: String(e) }) }
+})
+
 // ── HA service proxy ──────────────────────────────────────────────────────────
 app.post('/api/ha-service', express.json(), async (req, res) => {
   const ha = loadHASync()

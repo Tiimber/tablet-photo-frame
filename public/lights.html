@@ -32,36 +32,48 @@
         import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
         const GLOBAL_BRIGHTNESS_MULTIPLIER = 1.5;
+        const HA_POLL_MS = 8000;
 
+        // ── Static 3D light config library ──────────────────────────────────────
+        // "haKey" = room name fragment + light name fragment from lights.json (lowercase, used for matching)
         const HOME_LIGHTS_CONFIG_LIBRARY = [
-          { name: "Living room - rainbow light", type: "point", intensity: 0.50, on: true, floor: "bottom", coords: { x: 618.3, y: 167.0, z: 338.9 }, params: {} },
-          { name: "Living room - computer lights", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 532.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
-          { name: "Living room - massage lights", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 166.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
-          { name: "Kitchen - table light", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 465.0, y: 253.0, z: 40.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
-          { name: "Kitchen - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 230.0, y: 253.0, z: 166.2 }, params: {} },
-          { name: "Bedroom - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 163.0, y: 253.0, z: 495.2 }, params: {} },
-          { name: "Walk in closet - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 408.2 }, params: {} },
-          { name: "Entrance - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 579.2 }, params: {} },
-          { name: "Back entrance - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 270.0, y: 253.0, z: -170.8 }, params: {} },
-          { name: "Stairways - lower ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 39.0, y: 253.0, z: 54.2 }, params: {} },
-          { name: "Garage - wall right", type: "spot", intensity: 0.35, on: true, floor: "bottom", coords: { x: -132.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 } },
-          { name: "Garage - wall left", type: "spot", intensity: 0.35, on: true, floor: "bottom", coords: { x: -262.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 } },
-          { name: "Bathroom - spot1 (TL)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 18.0, y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
-          { name: "Bathroom - spot2 (TR)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
-          { name: "Bathroom - spot3 (L)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 18.0, y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
-          { name: "Bathroom - spot4 (R)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
-          { name: "Bathroom - spot5 (BL)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 18.0, y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
-          { name: "Bathroom - spot6 (BR)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
-          { name: "Laundry room - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: -217.0, y: 253.0, z: -170.8 }, params: {} },
-          { name: "Exercise room - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: -217.0, y: 241.0, z: -592.8 }, params: {} },
-          { name: "Play room - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: -217.0, y: 262.0, z: -1061.8 }, params: {} },
-          { name: "Stairway - upper wall", type: "point", intensity: 1.50, on: true, floor: "top", coords: { x: -0.9, y: 401.8, z: 245.0 }, params: {} },
-          { name: "Upstairs lobby - LED left", type: "led", intensity: 0.80, on: true, floor: "top", coords: { x: 230.7, y: 453.2, z: 277.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
-          { name: "Upstairs lobby - LED right", type: "led", intensity: 0.80, on: true, floor: "top", coords: { x: 230.7, y: 453.2, z: 413.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
-          { name: "Upstairs game room - LED left", type: "led", intensity: 0.80, on: true, floor: "top", coords: { x: 702.7, y: 453.2, z: 277.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
-          { name: "Upstairs game room - LED right", type: "led", intensity: 0.80, on: true, floor: "top", coords: { x: 702.7, y: 453.2, z: 413.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } }
+          { name: "Living room - rainbow light",      haRoom: "living room", haLight: "rainbow",    type: "point", maxIntensity: 0.50, floor: "bottom", coords: { x: 618.3, y: 167.0, z: 338.9 }, params: {} },
+          { name: "Living room - computer lights",    haRoom: "living room", haLight: "computer",   type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 532.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
+          { name: "Living room - massage lights",     haRoom: "living room", haLight: "massage",    type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 166.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
+          { name: "Kitchen - table light",            haRoom: "kitchen",     haLight: "table",      type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 465.0, y: 253.0, z: 40.2  }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
+          { name: "Kitchen - ceiling",                haRoom: "kitchen",     haLight: "ceiling",    type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 230.0, y: 253.0, z: 166.2 }, params: {} },
+          { name: "Bedroom - ceiling",                haRoom: "bedroom",     haLight: "",           type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 163.0, y: 253.0, z: 495.2 }, params: {} },
+          { name: "Walk in closet - ceiling",         haRoom: "walk in closet", haLight: "",        type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 408.2 }, params: {} },
+          { name: "Entrance - ceiling",               haRoom: "entrance",    haLight: "front",      type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 579.2 }, params: {} },
+          { name: "Back entrance - ceiling",          haRoom: "entrance",    haLight: "back",       type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 270.0, y: 253.0, z: -170.8 }, params: {} },
+          { name: "Stairways - lower ceiling",        haRoom: "stairway",    haLight: "lower",      type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 39.0,  y: 253.0, z: 54.2  }, params: {} },
+          { name: "Garage - wall right",              haRoom: "garage",      haLight: "",           type: "spot",  maxIntensity: 0.35, floor: "bottom", coords: { x: -132.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 } },
+          { name: "Garage - wall left",               haRoom: "garage",      haLight: "",           type: "spot",  maxIntensity: 0.35, floor: "bottom", coords: { x: -262.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 } },
+          { name: "Bathroom - spot1 (TL)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 18.0,  y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot2 (TR)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot3 (L)",             haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 18.0,  y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot4 (R)",             haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot5 (BL)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 18.0,  y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot6 (BR)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Laundry room - ceiling",           haRoom: "laundry room", haLight: "",          type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: -217.0, y: 253.0, z: -170.8 }, params: {} },
+          { name: "Exercise room - ceiling",          haRoom: "exercise room", haLight: "",         type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: -217.0, y: 241.0, z: -592.8 }, params: {} },
+          { name: "Play room - ceiling",              haRoom: "play room",   haLight: "",           type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: -217.0, y: 262.0, z: -1061.8 }, params: {} },
+          { name: "Stairway - upper wall",            haRoom: "stairway",    haLight: "upper",      type: "point", maxIntensity: 1.50, floor: "top",    coords: { x: -0.9,  y: 401.8, z: 245.0 }, params: {} },
+          { name: "Upstairs lobby - LED left",        haRoom: "upstairs lobby", haLight: "",        type: "led",   maxIntensity: 0.80, floor: "top",    coords: { x: 230.7, y: 453.2, z: 277.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
+          { name: "Upstairs lobby - LED right",       haRoom: "upstairs lobby", haLight: "",        type: "led",   maxIntensity: 0.80, floor: "top",    coords: { x: 230.7, y: 453.2, z: 413.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
+          { name: "Upstairs game room - LED left",    haRoom: "game room",   haLight: "",           type: "led",   maxIntensity: 0.80, floor: "top",    coords: { x: 702.7, y: 453.2, z: 277.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
+          { name: "Upstairs game room - LED right",   haRoom: "game room",   haLight: "",           type: "led",   maxIntensity: 0.80, floor: "top",    coords: { x: 702.7, y: 453.2, z: 413.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
         ];
 
+        // ── HA state store ───────────────────────────────────────────────────────
+        // entity_id → { state, attributes }
+        let haStates = {};
+        // entity_id → array of cfg entries that use it
+        let entityToCfgs = {};
+        // cfg.name → THREE light object(s)
+        let cfgToLights = {};
+
+        // ── Scene globals ────────────────────────────────────────────────────────
         let houseCutPlane, globalHouse, ambientLight, sunLight;
         let activeFloorMode = 'bottom';
         let targetPlaneHeight = 280;
@@ -122,12 +134,160 @@
         }
         dashedCircleTexture = createDashedCircleTexture();
 
+        // ── Color helpers ────────────────────────────────────────────────────────
+
+        // Convert mireds color_temp to a warm/cool RGB THREE.Color
+        function miredsToColor(mireds) {
+            // mireds range typically 153 (6500K cool) – 500 (2000K warm)
+            const kelvin = 1000000 / Math.max(mireds, 1);
+            return kelvinToThreeColor(kelvin);
+        }
+
+        function kelvinToThreeColor(K) {
+            // Tanner Helland algorithm
+            K = Math.max(1000, Math.min(40000, K)) / 100;
+            let r, g, b;
+            if (K <= 66) {
+                r = 255;
+                g = K <= 0 ? 0 : Math.min(255, 99.4708025861 * Math.log(K) - 161.1195681661);
+                b = K >= 19 ? Math.min(255, 138.5177312231 * Math.log(K - 10) - 305.0447927307) : 0;
+            } else {
+                r = Math.min(255, 329.698727446 * Math.pow(K - 60, -0.1332047592));
+                g = Math.min(255, 288.1221695283 * Math.pow(K - 60, -0.0755148492));
+                b = 255;
+            }
+            return new THREE.Color(Math.max(0,r)/255, Math.max(0,g)/255, Math.max(0,b)/255);
+        }
+
+        function haStateToColor(attrs) {
+            if (attrs.rgb_color) {
+                const [r,g,b] = attrs.rgb_color;
+                return new THREE.Color(r/255, g/255, b/255);
+            }
+            if (attrs.hs_color) {
+                const c = new THREE.Color();
+                c.setHSL(attrs.hs_color[0]/360, attrs.hs_color[1]/100, 0.5);
+                return c;
+            }
+            if (attrs.color_temp) return miredsToColor(attrs.color_temp);
+            return new THREE.Color(0xffe0a3); // warm white default
+        }
+
+        // ── HA state → 3D light update ───────────────────────────────────────────
+
+        function applyHAStateToCfg(cfg) {
+            const lights3d = cfgToLights[cfg.name];
+            if (!lights3d || lights3d.length === 0) return;
+
+            const entityId = cfg._entityId;
+            const st = entityId ? haStates[entityId] : null;
+            const isOn = st ? (st.state === 'on') : cfg._defaultOn;
+            const attrs = (st && st.attributes) || {};
+
+            // brightness: 0–255 → 0–1 fraction, default 1.0 if on
+            const brightFrac = attrs.brightness != null ? attrs.brightness / 255 : (isOn ? 1.0 : 0.0);
+            const color = isOn ? haStateToColor(attrs) : new THREE.Color(0xffe0a3);
+
+            for (const lObj of lights3d) {
+                lObj.visible = isOn;
+                if (!isOn) continue;
+                lObj.color.copy(color);
+                if (cfg.type === 'point') {
+                    lObj.intensity = cfg.maxIntensity * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
+                } else if (cfg.type === 'spot') {
+                    lObj.intensity = (cfg.maxIntensity * 1.5) * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
+                } else if (cfg.type === 'led') {
+                    lObj.intensity = cfg.maxIntensity * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER * 2.0;
+                }
+            }
+        }
+
+        function applyAllHAStates() {
+            for (const cfg of HOME_LIGHTS_CONFIG_LIBRARY) applyHAStateToCfg(cfg);
+        }
+
+        // ── HA fetch ─────────────────────────────────────────────────────────────
+
+        async function fetchHAStates() {
+            const entities = Object.keys(entityToCfgs);
+            if (entities.length === 0) return;
+            try {
+                const r = await fetch('/api/ha-states-batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ entities })
+                });
+                if (!r.ok) return;
+                const map = await r.json();
+                for (const [id, st] of Object.entries(map)) {
+                    if (st) haStates[id] = st;
+                }
+                applyAllHAStates();
+            } catch(e) { /* silent */ }
+        }
+
+        // ── Build entity→cfg mapping from lights.json ────────────────────────────
+
+        async function buildEntityMapping() {
+            let lightsConfig = { rooms: [] };
+            try {
+                const r = await fetch('/api/lights/config');
+                lightsConfig = await r.json();
+            } catch(e) { /* no lights.json, fall back to defaults */ }
+
+            // Build a flat list: { roomName, lightName, entity_id }
+            const flatLights = [];
+            for (const room of (lightsConfig.rooms || [])) {
+                for (const light of (room.lights || [])) {
+                    flatLights.push({
+                        roomName: room.name.toLowerCase(),
+                        lightName: light.name.toLowerCase(),
+                        entity_id: light.entity_id
+                    });
+                }
+            }
+
+            entityToCfgs = {};
+
+            for (const cfg of HOME_LIGHTS_CONFIG_LIBRARY) {
+                const rKey = cfg.haRoom.toLowerCase();
+                const lKey = cfg.haLight.toLowerCase();
+
+                // Find best matching entity: room must match, then light name if specified
+                let matched = null;
+                const roomMatches = flatLights.filter(fl => fl.roomName === rKey);
+
+                if (roomMatches.length === 0) {
+                    cfg._entityId = null;
+                    cfg._defaultOn = false;
+                    continue;
+                }
+
+                if (lKey === '') {
+                    // No light sub-key: use first entity in room (or only one)
+                    matched = roomMatches[0];
+                } else {
+                    // Try substring match on light name
+                    matched = roomMatches.find(fl => fl.lightName.includes(lKey) || lKey.includes(fl.lightName));
+                    if (!matched) matched = roomMatches[0]; // fallback to first in room
+                }
+
+                cfg._entityId = matched.entity_id;
+                cfg._defaultOn = false;
+
+                if (!entityToCfgs[matched.entity_id]) entityToCfgs[matched.entity_id] = [];
+                entityToCfgs[matched.entity_id].push(cfg);
+            }
+        }
+
+        // ── GLTF + scene setup ───────────────────────────────────────────────────
+
         const gltfLoader = new GLTFLoader();
         const dracoLoader = new DRACOLoader();
         dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
         gltfLoader.setDRACOLoader(dracoLoader);
 
-        gltfLoader.load('house_dashboard.glb', (gltf) => {
+        gltfLoader.load('house_dashboard.glb', async (gltf) => {
             globalHouse = gltf.scene;
             globalHouse.traverse((node) => {
                 if (baseLayers.includes(node.name)) node.renderOrder = 1;
@@ -171,9 +331,17 @@
 
             scene.add(globalHouse);
             applyFloorVisibilityPipeline();
+
+            // Build entity mapping, then instantiate lights, then fetch HA states
+            await buildEntityMapping();
             instantiateDashboardLights();
+            await fetchHAStates();
+
             updateAstroEnvironmentDimmer();
+            setInterval(fetchHAStates, HA_POLL_MS);
         });
+
+        // ── Astro dimmer ─────────────────────────────────────────────────────────
 
         function getSolarElevationAngle(lat, lon) {
             const now = new Date();
@@ -197,6 +365,8 @@
         }
         setInterval(updateAstroEnvironmentDimmer, 120000);
 
+        // ── Floor visibility ─────────────────────────────────────────────────────
+
         function applyFloorVisibilityPipeline() {
             if (!globalHouse) return;
             globalHouse.traverse((node) => {
@@ -205,12 +375,16 @@
             });
             compiledActiveSceneLights.forEach(group => {
                 if (group.userData.floor !== activeFloorMode) { group.visible = false; }
-                else { group.visible = true; group.traverse(n => { if (n.isLight) n.visible = group.userData.on; }); }
+                else { group.visible = true; }
             });
         }
 
+        // ── Instantiate 3D lights ────────────────────────────────────────────────
+
         function instantiateDashboardLights() {
+            cfgToLights = {};
             let bathroomGroupMaster = null;
+
             HOME_LIGHTS_CONFIG_LIBRARY.forEach((cfg) => {
                 const isBathroomFixture = cfg.name.startsWith("Bathroom - spot");
                 let targetGroup = null;
@@ -218,7 +392,7 @@
                 if (isBathroomFixture) {
                     if (!bathroomGroupMaster) {
                         bathroomGroupMaster = new THREE.Group();
-                        bathroomGroupMaster.userData = { isBathroomMaster: true, childConfigs: [], floor: "bottom", on: cfg.on };
+                        bathroomGroupMaster.userData = { isBathroomMaster: true, childConfigs: [], floor: "bottom" };
                         const cx = 62.0, cy = 253.0, cz = -192.8;
                         const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
                         hitBoxMesh.position.set(cx, cy, cz); hitBoxMesh.userData = { parentGroup: bathroomGroupMaster };
@@ -234,7 +408,7 @@
                     targetGroup.userData.childConfigs.push(cfg);
                 } else {
                     targetGroup = new THREE.Group();
-                    targetGroup.userData = { configRef: cfg, floor: cfg.floor, on: cfg.on };
+                    targetGroup.userData = { configRef: cfg, floor: cfg.floor };
                     const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
                     hitBoxMesh.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); hitBoxMesh.userData = { parentGroup: targetGroup };
                     targetGroup.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
@@ -247,28 +421,41 @@
                     scene.add(targetGroup); compiledActiveSceneLights.push(targetGroup);
                 }
 
+                // Create the actual THREE light and register it
+                let light3d = null;
                 if (cfg.type === 'point') {
-                    const pLight = new THREE.PointLight(0xffe0a3, cfg.intensity * GLOBAL_BRIGHTNESS_MULTIPLIER, 800, 1.0);
-                    pLight.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); pLight.visible = cfg.on;
-                    targetGroup.add(pLight);
+                    light3d = new THREE.PointLight(0xffe0a3, cfg.maxIntensity * GLOBAL_BRIGHTNESS_MULTIPLIER, 800, 1.0);
+                    light3d.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
+                    light3d.visible = false;
+                    targetGroup.add(light3d);
                 } else if (cfg.type === 'spot') {
                     const sParams = cfg.spotParams || { angle: 45, pitch: -90, yaw: 0 };
-                    const sLight = new THREE.SpotLight(0xfff5d6, (cfg.intensity * 1.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sParams.angle * (Math.PI / 180), 0.5, 0);
-                    sLight.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); sLight.visible = cfg.on;
+                    light3d = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 1.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sParams.angle * (Math.PI / 180), 0.5, 0);
+                    light3d.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
+                    light3d.visible = false;
                     const pitchRad = sParams.pitch * (Math.PI / 180), yawRad = sParams.yaw * (Math.PI / 180), ld = 150;
                     const tNode = new THREE.Object3D();
                     tNode.position.set(cfg.coords.x + ld * Math.sin(yawRad) * Math.cos(pitchRad), cfg.coords.y + ld * Math.sin(pitchRad), cfg.coords.z + ld * Math.cos(yawRad) * Math.cos(pitchRad));
-                    scene.add(tNode); sLight.target = tNode; targetGroup.add(sLight);
+                    scene.add(tNode); light3d.target = tNode;
+                    targetGroup.add(light3d);
                 } else if (cfg.type === 'led') {
-                    const lParams = cfg.ledParams || { length: 150, spacing: 15, yawRad: -90, pitchRad: -90 };
-                    const unifiedWashLight = new THREE.PointLight(0xffe0a3, cfg.intensity * GLOBAL_BRIGHTNESS_MULTIPLIER * 2.0, lParams.length * 2.0, 0.5);
-                    unifiedWashLight.position.set(cfg.coords.x, cfg.coords.y - 10, cfg.coords.z);
-                    unifiedWashLight.visible = cfg.on;
-                    targetGroup.add(unifiedWashLight);
+                    const lParams = cfg.ledParams || { length: 150, spacing: 15 };
+                    light3d = new THREE.PointLight(0xffe0a3, cfg.maxIntensity * GLOBAL_BRIGHTNESS_MULTIPLIER * 2.0, lParams.length * 2.0, 0.5);
+                    light3d.position.set(cfg.coords.x, cfg.coords.y - 10, cfg.coords.z);
+                    light3d.visible = false;
+                    targetGroup.add(light3d);
+                }
+
+                if (light3d) {
+                    if (!cfgToLights[cfg.name]) cfgToLights[cfg.name] = [];
+                    cfgToLights[cfg.name].push(light3d);
                 }
             });
+
             applyFloorVisibilityPipeline();
         }
+
+        // ── Click handler ────────────────────────────────────────────────────────
 
         renderer.domElement.addEventListener('pointerdown', (event) => {
             const rect = renderer.domElement.getBoundingClientRect();
@@ -281,16 +468,30 @@
             const intersects = raycaster.intersectObjects(clickableBeadObjects);
             if (intersects.length > 0) {
                 const parentGroup = intersects[0].object.userData.parentGroup;
-                parentGroup.userData.on = !parentGroup.userData.on;
-                const isNowOn = parentGroup.userData.on;
                 if (parentGroup.userData.isBathroomMaster) {
-                    parentGroup.userData.childConfigs.forEach(c => c.on = isNowOn);
-                    console.log(`Sync Target: "Bathroom Spots (Merged)" -> Status: ${isNowOn}`);
+                    const cfgs = parentGroup.userData.childConfigs;
+                    const entityId = cfgs[0]?._entityId;
+                    if (entityId) {
+                        const isOn = haStates[entityId]?.state === 'on';
+                        const newOn = !isOn;
+                        if (haStates[entityId]) haStates[entityId].state = newOn ? 'on' : 'off';
+                        applyAllHAStates();
+                        fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ domain: 'light', service: newOn ? 'turn_on' : 'turn_off', data: { entity_id: entityId } }) });
+                    }
                 } else {
-                    parentGroup.userData.configRef.on = isNowOn;
-                    console.log(`Sync Target: "${parentGroup.userData.configRef.name}" -> Status: ${isNowOn}`);
+                    const cfg = parentGroup.userData.configRef;
+                    if (cfg && cfg._entityId) {
+                        const isOn = haStates[cfg._entityId]?.state === 'on';
+                        const newOn = !isOn;
+                        if (!haStates[cfg._entityId]) haStates[cfg._entityId] = { state: 'off', attributes: {} };
+                        haStates[cfg._entityId].state = newOn ? 'on' : 'off';
+                        applyAllHAStates();
+                        const domain = cfg._entityId.startsWith('switch.') ? 'switch' : 'light';
+                        fetch('/api/ha-service', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ domain, service: newOn ? 'turn_on' : 'turn_off', data: { entity_id: cfg._entityId } }) });
+                    }
                 }
-                parentGroup.traverse(node => { if (node.isLight) node.visible = isNowOn; });
             }
         });
 
@@ -306,6 +507,8 @@
             activeFloorMode = 'bottom'; targetPlaneHeight = 280; targetBottomFloorOpacity = 0.0;
             applyFloorVisibilityPipeline();
         });
+
+        // ── Render loop ──────────────────────────────────────────────────────────
 
         const clock = new THREE.Clock();
         let frameDelta = 0;
