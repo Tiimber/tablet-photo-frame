@@ -112,6 +112,8 @@
         let entityToCfgs = {};
         // cfg.name → THREE light object(s)
         let cfgToLights = {};
+        // cfg.name → glow sprite(s)
+        let cfgToGlowSprites = {};
         // rainbow light THREE.PointLight reference for animation
         let rainbowLight3d = null;
         let rainbowHue = 0;
@@ -202,6 +204,21 @@
         }
         dashedCircleTexture = createDashedCircleTexture();
 
+        function createGlowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+            grad.addColorStop(0,   'rgba(255,255,255,1.0)');
+            grad.addColorStop(0.2, 'rgba(255,255,255,0.6)');
+            grad.addColorStop(0.5, 'rgba(255,255,255,0.15)');
+            grad.addColorStop(1,   'rgba(255,255,255,0.0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 128, 128);
+            return new THREE.CanvasTexture(canvas);
+        }
+        const glowTexture = createGlowTexture();
+
         // ── Color helpers ────────────────────────────────────────────────────────
 
         // Convert mireds color_temp to a warm/cool RGB THREE.Color
@@ -263,9 +280,17 @@
                 if (cfg.type === 'point') {
                     lObj.intensity = cfg.maxIntensity * 2.0 * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
                 } else if (cfg.type === 'spot') {
-                    lObj.intensity = (cfg.maxIntensity * 1.5) * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
+                    lObj.intensity = (cfg.maxIntensity * 2.5) * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
                 } else if (cfg.type === 'led') {
                     lObj.intensity = cfg.maxIntensity * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER * 2.0;
+                }
+            }
+            // Update glow sprites
+            const sprites = cfgToGlowSprites[cfg.name];
+            if (sprites) {
+                for (const sp of sprites) {
+                    sp.visible = isOn;
+                    if (isOn) sp.material.color.copy(color);
                 }
             }
         }
@@ -518,7 +543,7 @@
                     if (cfg.rainbow) rainbowLight3d = light3d;
                 } else if (cfg.type === 'spot') {
                     const sParams = cfg.spotParams || { angle: 45, pitch: -90, yaw: 0 };
-                    light3d = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 1.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sParams.angle * (Math.PI / 180), 0.5, 0);
+                    light3d = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 2.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sParams.angle * (Math.PI / 180), 0.1, 0);
                     light3d.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
                     light3d.visible = false;
                     const pitchRad = sParams.pitch * (Math.PI / 180), yawRad = sParams.yaw * (Math.PI / 180), ld = 150;
@@ -528,7 +553,7 @@
                     targetGroup.add(light3d);
                     if (cfg.spotParams2) {
                         const sP2 = cfg.spotParams2;
-                        const light3d2 = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 1.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sP2.angle * (Math.PI / 180), 0.5, 0);
+                        const light3d2 = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 2.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sP2.angle * (Math.PI / 180), 0.1, 0);
                         light3d2.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
                         light3d2.visible = false;
                         const p2 = sP2.pitch * (Math.PI / 180), y2 = sP2.yaw * (Math.PI / 180);
@@ -539,6 +564,16 @@
                         if (!cfgToLights[cfg.name]) cfgToLights[cfg.name] = [];
                         cfgToLights[cfg.name].push(light3d2);
                     }
+                    // Glow sprite at light origin
+                    if (!cfgToGlowSprites[cfg.name]) cfgToGlowSprites[cfg.name] = [];
+                    const glowMat = new THREE.SpriteMaterial({ map: glowTexture, color: 0xfff5d6, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
+                    const glowSprite = new THREE.Sprite(glowMat);
+                    glowSprite.scale.set(180, 180, 1);
+                    glowSprite.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
+                    glowSprite.visible = false;
+                    glowSprite.renderOrder = 5;
+                    targetGroup.add(glowSprite);
+                    cfgToGlowSprites[cfg.name].push(glowSprite);
                 } else if (cfg.type === 'led') {
                     const lParams = cfg.ledParams || { length: 150, spacing: 15 };
                     light3d = new THREE.PointLight(0xffe0a3, cfg.maxIntensity * GLOBAL_BRIGHTNESS_MULTIPLIER * 2.0, lParams.length * 2.0, 0.5);
