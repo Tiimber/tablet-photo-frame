@@ -259,7 +259,7 @@
                 if (!isOn) continue;
                 if (!cfg.rainbow) lObj.color.copy(color); // rainbow color is driven by animation loop
                 if (cfg.type === 'point') {
-                    lObj.intensity = cfg.maxIntensity * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
+                    lObj.intensity = cfg.maxIntensity * 2.0 * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
                 } else if (cfg.type === 'spot') {
                     lObj.intensity = (cfg.maxIntensity * 1.5) * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
                 } else if (cfg.type === 'led') {
@@ -513,9 +513,13 @@
                 // Create the actual THREE light and register it
                 let light3d = null;
                 if (cfg.type === 'point') {
-                    light3d = new THREE.PointLight(0xffe0a3, cfg.maxIntensity * GLOBAL_BRIGHTNESS_MULTIPLIER * 3.0, 1200, 1.0);
+                    // Use SpotLight pointing down — PointLights often don't illuminate scene geometry reliably
+                    light3d = new THREE.SpotLight(0xffe0a3, cfg.maxIntensity * 2.0 * GLOBAL_BRIGHTNESS_MULTIPLIER, 1500, 80 * (Math.PI/180), 0.6, 0);
                     light3d.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
                     light3d.visible = false;
+                    const tDown = new THREE.Object3D();
+                    tDown.position.set(cfg.coords.x, 0, cfg.coords.z);
+                    scene.add(tDown); light3d.target = tDown;
                     targetGroup.add(light3d);
                     if (cfg.rainbow) rainbowLight3d = light3d;
                 } else if (cfg.type === 'spot') {
