@@ -467,7 +467,7 @@
                         bathroomGroupMaster = new THREE.Group();
                         bathroomGroupMaster.userData = { isBathroomMaster: true, childConfigs: [], floor: "bottom" };
                         const cx = 62.0, cy = 253.0, cz = -192.8;
-                        const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+                        const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(30, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
                         hitBoxMesh.position.set(cx, cy, cz); hitBoxMesh.userData = { parentGroup: bathroomGroupMaster };
                         bathroomGroupMaster.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
                         const pointGeo = new THREE.BufferGeometry();
@@ -484,8 +484,8 @@
                     targetGroup.userData = { configRef: cfg, floor: cfg.floor };
                     const pointGeo = new THREE.BufferGeometry();
                     pointGeo.setAttribute('position', new THREE.Float32BufferAttribute([cfg.coords.x, cfg.coords.y, cfg.coords.z], 3));
-                    // Always add hitbox for interaction
-                    const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+                    // Always add hitbox for interaction — radius 30 to cover full visual bead
+                    const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(30, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
                     hitBoxMesh.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); hitBoxMesh.userData = { parentGroup: targetGroup };
                     targetGroup.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
                     // Rainbow lights get rainbow bead texture; others get standard dashed circle
