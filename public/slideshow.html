@@ -2353,6 +2353,12 @@
     catch { lxConfig = { rooms: [] } }
   }
 
+  async function lxFetchAllRoomStates() {
+    if (!lxConfig) return
+    const all = lxConfig.rooms.flatMap(r => r.lights.map(l => l.entity_id))
+    if (all.length) await lxFetchStates(all)
+  }
+
   async function lxFetchStates(entities) {
     const results = await Promise.allSettled(
       entities.map(e => fetch('/api/ha-state/' + e).then(r => r.json()))
@@ -2376,7 +2382,20 @@
   }
   function lxSupportsColorTemp(id) {
     const modes = lxStates[id]?.attributes?.supported_color_modes || []
-    return modes.some(m => ['color_temp','xy','hs','rgb','rgbw','rgbww'].includes(m))
+    return modes.includes('color_temp')
+  }
+  function lxSupportsColor(id) {
+    const modes = lxStates[id]?.attributes?.supported_color_modes || []
+    return modes.some(m => ['xy','hs','rgb','rgbw','rgbww'].includes(m))
+  }
+  function lxCurrentColor(id) {
+    const a = lxStates[id]?.attributes || {}
+    if (a.rgb_color) return `rgb(${a.rgb_color.join(',')})`
+    if (a.hs_color) {
+      const [h, s] = a.hs_color
+      return `hsl(${h},${s}%,50%)`
+    }
+    return null
   }
 
   async function lxCallService(domain, service, data) {
@@ -2446,11 +2465,12 @@
     const { entity_id: id, name } = light
     const on  = lxIsOn(id)
     const sw  = lxIsSwitch(id)
-    const eid = id.replace(/\./g, '_')
     const bPct = lxBrightnessPct(id)
     const ct   = lxColorTemp(id)
     const ctr  = lxColorTempRange(id)
     const hasCT = !sw && lxSupportsColorTemp(id)
+    const hasColor = !sw && lxSupportsColor(id)
+    const curColor = hasColor ? lxCurrentColor(id) : null
     let sliders = ''
     if (!sw && on) {
       sliders = '<div class="lx-sliders">'
@@ -2469,6 +2489,12 @@
             oninput="this.nextElementSibling.textContent=this.value"
             onchange="lxSetColorTemp('${id}',+this.value)">
           <div class="lx-slider-val">${ct}</div></div>`
+      }
+      if (hasColor && curColor) {
+        sliders += `<div class="lx-slider-row">
+          <div class="lx-slider-label">Color</div>
+          <div class="lx-color-swatch" style="background:${curColor};width:32px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);flex-shrink:0"></div>
+          <div class="lx-slider-val" style="color:${curColor}">${curColor.startsWith('hsl') ? Math.round(lxStates[id]?.attributes?.hs_color?.[0] ?? 0)+'°' : ''}</div></div>`
       }
       sliders += '</div>'
     }
@@ -2545,7 +2571,7 @@
     document.getElementById('lx-tab-map').classList.toggle('active', tab === 'map')
     document.getElementById('lx-simple-view').classList.toggle('hidden', tab !== 'simple')
     document.getElementById('lx-map-view').classList.toggle('active', tab === 'map')
-    if (tab === 'simple') lxInit().then(() => lxRenderRooms())
+    if (tab === 'simple') lxInit().then(() => lxFetchAllRoomStates()).then(() => lxRenderRooms())
   }
 
   window.lxSetTab = lxSetTab
