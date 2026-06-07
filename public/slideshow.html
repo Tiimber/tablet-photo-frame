@@ -3198,7 +3198,10 @@
 
   // Dashboard touch+mouse: swipe-up → close, swipe left/right → change screen
   let dbSwipeStart = null
-  function dbGestureStart(x, y) { dbSwipeStart = { x, y } }
+  function dbGestureStart(x, y, target) {
+    if (target && target.tagName === 'INPUT' && target.type === 'range') return
+    dbSwipeStart = { x, y }
+  }
   function dbGestureEnd(x, y) {
     if (!dbSwipeStart) return
     const dx = x - dbSwipeStart.x
@@ -3211,14 +3214,14 @@
     }
   }
   dashboardEl.addEventListener('touchstart', e => {
-    dbGestureStart(e.touches[0].clientX, e.touches[0].clientY)
+    dbGestureStart(e.touches[0].clientX, e.touches[0].clientY, e.target)
   }, { passive: true })
   dashboardEl.addEventListener('touchend', e => {
     dbGestureEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY)
   })
   dashboardEl.addEventListener('mousedown', e => {
     if (Date.now() - lastTouchEnd < 600) return
-    dbGestureStart(e.clientX, e.clientY)
+    dbGestureStart(e.clientX, e.clientY, e.target)
   })
   dashboardEl.addEventListener('mouseup', e => {
     if (Date.now() - lastTouchEnd < 600) return
