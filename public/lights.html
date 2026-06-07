@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lights</title>
+    <style>
+        body { margin: 0; background: #0b0b0b; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: system-ui, -apple-system, sans-serif; color: #fff; user-select: none; overflow: hidden; }
+        #dashboard-container { position: relative; width: 850px; height: 1095px; background: #121212; box-shadow: 0 25px 60px rgba(0,0,0,0.8); border: 1px solid #222; border-radius: 16px; overflow: hidden; }
+        .floor-overlay { position: absolute; top: 25px; right: 25px; display: flex; flex-direction: column; gap: 10px; z-index: 100; background: rgba(20,20,20,0.75); padding: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
+        .floor-btn { padding: 12px 24px; background: #2c2c2e; color: #e5e5ea; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; text-align: center; width: 150px; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); }
+        .floor-btn.active { background: #00ff00; color: #000; box-shadow: 0 0 15px rgba(0,255,0,0.3); }
+        .astro-readout { position: absolute; bottom: 25px; left: 25px; font-family: monospace; font-size: 11px; color: #666; background: rgba(10,10,10,0.6); padding: 6px 12px; border-radius: 6px; pointer-events: none; z-index: 100; border: 1px solid #222; }
+    </style>
+</head>
+<body>
+    <div id="dashboard-container">
+        <div class="floor-overlay">
+            <button class="floor-btn" id="btn-top">Top Floor</button>
+            <button class="floor-btn active" id="btn-bottom">Bottom Floor</button>
+        </div>
+        <div class="astro-readout" id="astro-status">Astro-Dimmer Engine: Syncing...</div>
+    </div>
+
+    <script type="importmap">
+      { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+        const GLOBAL_BRIGHTNESS_MULTIPLIER = 1.5;
+
+        const HOME_LIGHTS_CONFIG_LIBRARY = [
+          { name: "Living room - rainbow light", type: "point", intensity: 0.50, on: true, floor: "bottom", coords: { x: 618.3, y: 167.0, z: 338.9 }, params: {} },
+          { name: "Living room - computer lights", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 532.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
+          { name: "Living room - massage lights", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 166.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
+          { name: "Kitchen - table light", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 465.0, y: 253.0, z: 40.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
+          { name: "Kitchen - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 230.0, y: 253.0, z: 166.2 }, params: {} },
+          { name: "Bedroom - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 163.0, y: 253.0, z: 495.2 }, params: {} },
+          { name: "Walk in closet - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 408.2 }, params: {} },
+          { name: "Entrance - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 579.2 }, params: {} },
+          { name: "Back entrance - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 270.0, y: 253.0, z: -170.8 }, params: {} },
+          { name: "Stairways - lower ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: 39.0, y: 253.0, z: 54.2 }, params: {} },
+          { name: "Garage - wall right", type: "spot", intensity: 0.35, on: true, floor: "bottom", coords: { x: -132.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 } },
+          { name: "Garage - wall left", type: "spot", intensity: 0.35, on: true, floor: "bottom", coords: { x: -262.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 } },
+          { name: "Bathroom - spot1 (TL)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 18.0, y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot2 (TR)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot3 (L)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 18.0, y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot4 (R)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot5 (BL)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 18.0, y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot6 (BR)", type: "spot", intensity: 1.00, on: true, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Laundry room - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: -217.0, y: 253.0, z: -170.8 }, params: {} },
+          { name: "Exercise room - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: -217.0, y: 241.0, z: -592.8 }, params: {} },
+          { name: "Play room - ceiling", type: "point", intensity: 0.80, on: true, floor: "bottom", coords: { x: -217.0, y: 262.0, z: -1061.8 }, params: {} },
+          { name: "Stairway - upper wall", type: "point", intensity: 1.50, on: true, floor: "top", coords: { x: -0.9, y: 401.8, z: 245.0 }, params: {} },
+          { name: "Upstairs lobby - LED left", type: "led", intensity: 0.80, on: true, floor: "top", coords: { x: 230.7, y: 453.2, z: 277.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
+          { name: "Upstairs lobby - LED right", type: "led", intensity: 0.80, on: true, floor: "top", coords: { x: 230.7, y: 453.2, z: 413.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
+          { name: "Upstairs game room - LED left", type: "led", intensity: 0.80, on: true, floor: "top", coords: { x: 702.7, y: 453.2, z: 277.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
+          { name: "Upstairs game room - LED right", type: "led", intensity: 0.80, on: true, floor: "top", coords: { x: 702.7, y: 453.2, z: 413.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } }
+        ];
+
+        let houseCutPlane, globalHouse, ambientLight, sunLight;
+        let activeFloorMode = 'bottom';
+        let targetPlaneHeight = 280;
+        let currentBottomFloorOpacity = 0.0;
+        let targetBottomFloorOpacity = 0.0;
+        const animationSpeed = 0.07;
+        let bottomFloorMeshesToFade = [];
+        let compiledActiveSceneLights = [];
+        let clickableBeadObjects = [];
+        let dashedCircleTexture = null;
+
+        const topFloorHidden = ["top_1767","left_1768","right_1769","front_1771","top_1773","left_1774","right_1775","front_1777","top_1779","left_1780","right_1781","front_1783","top_1785","left_1786","right_1787","front_1789"];
+        const secondFloorPlates = ["room_95_431","room_96_432","room_97_433","room_98_434"];
+        const secondFloorWalls = ["wall_50_298","wall_51_305","wall_64_383","wall_62_371","wall_54_322","wall_56_334","wall_53_316","wall_52_311","wall_50_299","wall_51_304","wall_60_359","wall_48_287","wall_49_293","wall_59_353","wall_55_329","wall_54_323","wall_56_335","wall_57_341","wall_58_346","wall_61_364","wall_65_388","wall_63_376","wall_64_382","wall_62_370","wall_66_395","wall_67_400","wall_66_394","wall_67_401","wall_57_340","wall_55_328","wall_59_352","wall_60_358","wall_65_389","wall_63_377","wall_61_365","wall_58_347"];
+        const fadingElements = ["top_1791","left_1792","right_1793","back_1794","front_1795","top_1797","left_1798","right_1799","back_1800","front_1801","top_1803","left_1804","right_1805","front_1807","top_1809","left_1810","right_1811","back_1812","front_1813","top_1815","left_1816","right_1817","back_1818","front_1819","top_1821","left_1822","right_1823","back_1824","front_1825"];
+        const baseLayers = ["room_68_404","756","PolyMesh_4_841"];
+        const overlayLayers = ["Oriental_rug_1001","752","1015","838","PolyMesh_6_839"];
+
+        const container = document.getElementById('dashboard-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0c0c0d);
+
+        const camera = new THREE.PerspectiveCamera(50, 850 / 1095, 0.1, 10000);
+        camera.position.set(302.2, 2215.9, 1206.6);
+        camera.rotation.order = 'YXZ';
+        camera.rotation.x = -62.1 * (Math.PI / 180);
+        camera.rotation.y = -0.3 * (Math.PI / 180);
+        camera.rotation.z = -0.6 * (Math.PI / 180);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(850, 1095);
+        renderer.localClippingEnabled = true;
+        container.appendChild(renderer.domElement);
+
+        ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        scene.add(ambientLight);
+        sunLight = new THREE.DirectionalLight(0xffffff, 0.2);
+        sunLight.position.set(500, 1000, 700);
+        scene.add(sunLight);
+
+        houseCutPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 280);
+
+        function createDashedCircleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 128, 128);
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 10;
+            ctx.beginPath(); ctx.arc(64, 64, 54, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([16, 12]); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(64, 64, 54, 0, Math.PI * 2); ctx.stroke();
+            return new THREE.CanvasTexture(canvas);
+        }
+        dashedCircleTexture = createDashedCircleTexture();
+
+        const gltfLoader = new GLTFLoader();
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+        gltfLoader.setDRACOLoader(dracoLoader);
+
+        gltfLoader.load('house_dashboard.glb', (gltf) => {
+            globalHouse = gltf.scene;
+            globalHouse.traverse((node) => {
+                if (baseLayers.includes(node.name)) node.renderOrder = 1;
+                if (overlayLayers.includes(node.name)) node.renderOrder = 2;
+                let parentCheck = node, isStructuralTarget = false, isFadingTarget = false;
+                while (parentCheck && parentCheck !== globalHouse) {
+                    if (secondFloorPlates.includes(parentCheck.name) || secondFloorWalls.includes(parentCheck.name)) { isStructuralTarget = true; break; }
+                    if (fadingElements.includes(parentCheck.name)) { isFadingTarget = true; break; }
+                    parentCheck = parentCheck.parent;
+                }
+                if (node.isMesh && node.material) {
+                    node.material.clippingPlanes = [houseCutPlane];
+                    if (isStructuralTarget) { node.material.transparent = false; node.material.opacity = 1.0; node.material.depthWrite = true; node.visible = false; }
+                    if (isFadingTarget) {
+                        node.material = Array.isArray(node.material) ? node.material.map(m => m.clone()) : node.material.clone();
+                        const mats = Array.isArray(node.material) ? node.material : [node.material];
+                        mats.forEach(mat => { mat.transparent = true; mat.depthWrite = true; mat.opacity = 0.0; });
+                        bottomFloorMeshesToFade.push(node); node.visible = false;
+                    }
+                    let p = node, isOverlay = false;
+                    while (p && p !== globalHouse) { if (overlayLayers.includes(p.name)) { isOverlay = true; break; } p = p.parent; }
+                    if (isOverlay) {
+                        const mats = Array.isArray(node.material) ? node.material : [node.material];
+                        mats.forEach(mat => { mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -4; });
+                    }
+                }
+            });
+            scene.add(globalHouse);
+            applyFloorVisibilityPipeline();
+            instantiateDashboardLights();
+            updateAstroEnvironmentDimmer();
+        });
+
+        function getSolarElevationAngle(lat, lon) {
+            const now = new Date();
+            const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+            const declination = 23.45 * Math.sin((360 / 365) * (dayOfYear - 80) * Math.PI / 180);
+            const timeInHours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+            const solarNoon = 12 - (lon / 15) - (now.getTimezoneOffset() / 60);
+            const hourAngle = (timeInHours - solarNoon) * 15;
+            const latRad = lat * Math.PI / 180, declRad = declination * Math.PI / 180, haRad = hourAngle * Math.PI / 180;
+            return Math.asin(Math.sin(latRad) * Math.sin(declRad) + Math.cos(latRad) * Math.cos(declRad) * Math.cos(haRad)) * 180 / Math.PI;
+        }
+
+        function updateAstroEnvironmentDimmer() {
+            const sunElevation = getSolarElevationAngle(55.84711188969688, 12.973289098447708);
+            const dimmingFactor = Math.max(0, Math.min(1, (sunElevation + 4) / 16));
+            ambientLight.intensity = (0.2 + dimmingFactor * 0.7) * GLOBAL_BRIGHTNESS_MULTIPLIER;
+            sunLight.intensity = (dimmingFactor * 0.6) * GLOBAL_BRIGHTNESS_MULTIPLIER;
+            const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('astro-status').innerText =
+                `Astro-Dimmer [${t}] | Sun Angle: ${sunElevation.toFixed(1)}° | Environment Glow: ${Math.round(dimmingFactor * 100)}%`;
+        }
+        setInterval(updateAstroEnvironmentDimmer, 120000);
+
+        function applyFloorVisibilityPipeline() {
+            if (!globalHouse) return;
+            globalHouse.traverse((node) => {
+                if (topFloorHidden.includes(node.name)) node.visible = (activeFloorMode === 'bottom');
+                if (secondFloorPlates.includes(node.name) || secondFloorWalls.includes(node.name)) node.visible = (activeFloorMode === 'top');
+            });
+            compiledActiveSceneLights.forEach(group => {
+                if (group.userData.floor !== activeFloorMode) { group.visible = false; }
+                else { group.visible = true; group.traverse(n => { if (n.isLight) n.visible = group.userData.on; }); }
+            });
+        }
+
+        function instantiateDashboardLights() {
+            let bathroomGroupMaster = null;
+            HOME_LIGHTS_CONFIG_LIBRARY.forEach((cfg) => {
+                const isBathroomFixture = cfg.name.startsWith("Bathroom - spot");
+                let targetGroup = null;
+                if (isBathroomFixture) {
+                    if (!bathroomGroupMaster) {
+                        bathroomGroupMaster = new THREE.Group();
+                        bathroomGroupMaster.userData = { isBathroomMaster: true, childConfigs: [], floor: "bottom", on: cfg.on };
+                        const cx = 62.0, cy = 253.0, cz = -192.8;
+                        const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+                        hitBoxMesh.position.set(cx, cy, cz); hitBoxMesh.userData = { parentGroup: bathroomGroupMaster };
+                        bathroomGroupMaster.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
+                        const pointGeo = new THREE.BufferGeometry();
+                        pointGeo.setAttribute('position', new THREE.Float32BufferAttribute([cx, cy, cz], 3));
+                        const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: 44, sizeAttenuation: false, map: dashedCircleTexture, transparent: true, depthTest: false, depthWrite: false });
+                        const clusterPts = new THREE.Points(pointGeo, pointMat); clusterPts.renderOrder = 999;
+                        bathroomGroupMaster.add(clusterPts);
+                        scene.add(bathroomGroupMaster); compiledActiveSceneLights.push(bathroomGroupMaster);
+                    }
+                    targetGroup = bathroomGroupMaster;
+                    targetGroup.userData.childConfigs.push(cfg);
+                } else {
+                    targetGroup = new THREE.Group();
+                    targetGroup.userData = { configRef: cfg, floor: cfg.floor, on: cfg.on };
+                    const hitBoxMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+                    hitBoxMesh.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); hitBoxMesh.userData = { parentGroup: targetGroup };
+                    targetGroup.add(hitBoxMesh); clickableBeadObjects.push(hitBoxMesh);
+                    const pointGeo = new THREE.BufferGeometry();
+                    pointGeo.setAttribute('position', new THREE.Float32BufferAttribute([cfg.coords.x, cfg.coords.y, cfg.coords.z], 3));
+                    const pointMat = new THREE.PointsMaterial({ color: 0xffffff, size: 44, sizeAttenuation: false, map: dashedCircleTexture, transparent: true, depthTest: false, depthWrite: false });
+                    const billboard = new THREE.Points(pointGeo, pointMat); billboard.renderOrder = 999;
+                    targetGroup.add(billboard);
+                    if (cfg.floor !== activeFloorMode) targetGroup.visible = false;
+                    scene.add(targetGroup); compiledActiveSceneLights.push(targetGroup);
+                }
+                if (cfg.type === 'point') {
+                    const pLight = new THREE.PointLight(0xffe0a3, cfg.intensity * GLOBAL_BRIGHTNESS_MULTIPLIER, 2500, 0);
+                    pLight.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); pLight.visible = cfg.on;
+                    targetGroup.add(pLight);
+                } else if (cfg.type === 'spot') {
+                    const sParams = cfg.spotParams || { angle: 45, pitch: -90, yaw: 0 };
+                    const sLight = new THREE.SpotLight(0xfff5d6, (cfg.intensity * 1.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sParams.angle * (Math.PI / 180), 0.5, 0);
+                    sLight.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z); sLight.visible = cfg.on;
+                    const pitchRad = sParams.pitch * (Math.PI / 180), yawRad = sParams.yaw * (Math.PI / 180), ld = 150;
+                    const tNode = new THREE.Object3D();
+                    tNode.position.set(cfg.coords.x + ld * Math.sin(yawRad) * Math.cos(pitchRad), cfg.coords.y + ld * Math.sin(pitchRad), cfg.coords.z + ld * Math.cos(yawRad) * Math.cos(pitchRad));
+                    scene.add(tNode); sLight.target = tNode; targetGroup.add(sLight);
+                } else if (cfg.type === 'led') {
+                    const lParams = cfg.ledParams || { length: 150, spacing: 15, yawRad: -90, pitchRad: -90 };
+                    const yawRad = lParams.yawRad * (Math.PI / 180), lightPitchRad = lParams.pitchRad * (Math.PI / 180);
+                    const dirX = Math.sin(yawRad), dirZ = Math.cos(yawRad);
+                    for (let k = 0; k < 3; k++) {
+                        const pct = (k + 1) / 4, dist = -(lParams.length / 2) + pct * lParams.length;
+                        const lx = cfg.coords.x + dirX * dist, lz = cfg.coords.z + dirZ * dist;
+                        const subLight = new THREE.SpotLight(0xffe0a3, (cfg.intensity * 2.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, lParams.length * 2.0, Math.PI / 3, 0.5, 0);
+                        subLight.position.set(lx, cfg.coords.y - 4, lz); subLight.visible = cfg.on;
+                        const tNode = new THREE.Object3D();
+                        tNode.position.set(lx + 100 * Math.sin(yawRad) * Math.cos(lightPitchRad), cfg.coords.y + 100 * Math.sin(lightPitchRad), lz + 100 * Math.cos(yawRad) * Math.cos(lightPitchRad));
+                        scene.add(tNode); subLight.target = tNode; targetGroup.add(subLight);
+                    }
+                }
+            });
+            applyFloorVisibilityPipeline();
+        }
+
+        renderer.domElement.addEventListener('pointerdown', (event) => {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                -((event.clientY - rect.top) / rect.height) * 2 + 1
+            );
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(clickableBeadObjects);
+            if (intersects.length > 0) {
+                const parentGroup = intersects[0].object.userData.parentGroup;
+                parentGroup.userData.on = !parentGroup.userData.on;
+                const isNowOn = parentGroup.userData.on;
+                if (parentGroup.userData.isBathroomMaster) {
+                    parentGroup.userData.childConfigs.forEach(c => c.on = isNowOn);
+                } else {
+                    parentGroup.userData.configRef.on = isNowOn;
+                }
+                parentGroup.traverse(node => { if (node.isLight) node.visible = isNowOn; });
+            }
+        });
+
+        document.getElementById('btn-top').addEventListener('click', () => {
+            document.getElementById('btn-bottom').classList.remove('active');
+            document.getElementById('btn-top').classList.add('active');
+            activeFloorMode = 'top'; targetPlaneHeight = 550; targetBottomFloorOpacity = 1.0;
+            applyFloorVisibilityPipeline();
+        });
+        document.getElementById('btn-bottom').addEventListener('click', () => {
+            document.getElementById('btn-top').classList.remove('active');
+            document.getElementById('btn-bottom').classList.add('active');
+            activeFloorMode = 'bottom'; targetPlaneHeight = 280; targetBottomFloorOpacity = 0.0;
+            applyFloorVisibilityPipeline();
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (houseCutPlane) {
+                const diffHeight = targetPlaneHeight - houseCutPlane.constant;
+                if (Math.abs(diffHeight) > 0.1) houseCutPlane.constant += diffHeight * animationSpeed;
+                else houseCutPlane.constant = targetPlaneHeight;
+            }
+            if (bottomFloorMeshesToFade.length > 0) {
+                const diffOpacity = targetBottomFloorOpacity - currentBottomFloorOpacity;
+                if (Math.abs(diffOpacity) > 0.01) {
+                    currentBottomFloorOpacity += diffOpacity * animationSpeed;
+                    bottomFloorMeshesToFade.forEach(mesh => {
+                        mesh.visible = true;
+                        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                        mats.forEach(mat => { mat.transparent = true; mat.opacity = currentBottomFloorOpacity; });
+                    });
+                } else {
+                    currentBottomFloorOpacity = targetBottomFloorOpacity;
+                    bottomFloorMeshesToFade.forEach(mesh => {
+                        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                        mats.forEach(mat => { mat.opacity = currentBottomFloorOpacity; mat.transparent = (currentBottomFloorOpacity < 1.0); });
+                        mesh.visible = (currentBottomFloorOpacity > 0);
+                    });
+                }
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
