@@ -101,6 +101,8 @@
           { name: "Upstairs lobby - LED right",       haRoom: "upstairs lobby", haLight: "",        type: "led",   maxIntensity: 0.80, floor: "top",    coords: { x: 230.7, y: 453.2, z: 413.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
           { name: "Upstairs game room - LED left",    haRoom: "game room",   haLight: "",           type: "led",   maxIntensity: 0.80, floor: "top",    coords: { x: 702.7, y: 453.2, z: 277.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
           { name: "Upstairs game room - LED right",   haRoom: "game room",   haLight: "",           type: "led",   maxIntensity: 0.80, floor: "top",    coords: { x: 702.7, y: 453.2, z: 413.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
+          { name: "Outdoor Entrance - left",  type: "spot", maxIntensity: 1.50, floor: "bottom", coords: { x: 376.5, y: 205.5, z: 723.6 }, spotParams: { angle: 25, pitch: -90, yaw: -90 }, spotParams2: { angle: 25, pitch: 90, yaw: -90 }, hardcodedEntityId: "light.entrance_left" },
+          { name: "Outdoor Entrance - right", type: "spot", maxIntensity: 1.50, floor: "bottom", coords: { x: 560.5, y: 205.5, z: 723.6 }, spotParams: { angle: 25, pitch: -90, yaw: -90 }, spotParams2: { angle: 25, pitch: 90, yaw: -90 }, hardcodedEntityId: "light.entrance_right" },
         ];
 
         // ── HA state store ───────────────────────────────────────────────────────
@@ -523,6 +525,19 @@
                     tNode.position.set(cfg.coords.x + ld * Math.sin(yawRad) * Math.cos(pitchRad), cfg.coords.y + ld * Math.sin(pitchRad), cfg.coords.z + ld * Math.cos(yawRad) * Math.cos(pitchRad));
                     scene.add(tNode); light3d.target = tNode;
                     targetGroup.add(light3d);
+                    if (cfg.spotParams2) {
+                        const sP2 = cfg.spotParams2;
+                        const light3d2 = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 1.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sP2.angle * (Math.PI / 180), 0.5, 0);
+                        light3d2.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
+                        light3d2.visible = false;
+                        const p2 = sP2.pitch * (Math.PI / 180), y2 = sP2.yaw * (Math.PI / 180);
+                        const tNode2 = new THREE.Object3D();
+                        tNode2.position.set(cfg.coords.x + ld * Math.sin(y2) * Math.cos(p2), cfg.coords.y + ld * Math.sin(p2), cfg.coords.z + ld * Math.cos(y2) * Math.cos(p2));
+                        scene.add(tNode2); light3d2.target = tNode2;
+                        targetGroup.add(light3d2);
+                        if (!cfgToLights[cfg.name]) cfgToLights[cfg.name] = [];
+                        cfgToLights[cfg.name].push(light3d2);
+                    }
                 } else if (cfg.type === 'led') {
                     const lParams = cfg.ledParams || { length: 150, spacing: 15 };
                     light3d = new THREE.PointLight(0xffe0a3, cfg.maxIntensity * GLOBAL_BRIGHTNESS_MULTIPLIER * 2.0, lParams.length * 2.0, 0.5);
