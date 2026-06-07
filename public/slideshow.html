@@ -2423,6 +2423,14 @@
     await lxCallService('light', 'turn_on', { entity_id, brightness })
   }
 
+  async function lxSetColor(entity_id, hue, sat) {
+    if (lxStates[entity_id]) {
+      lxStates[entity_id].attributes = lxStates[entity_id].attributes || {}
+      lxStates[entity_id].attributes.hs_color = [hue, sat]
+    }
+    await lxCallService('light', 'turn_on', { entity_id, hs_color: [hue, sat] })
+  }
+
   async function lxSetColorTemp(entity_id, mireds) {
     if (lxStates[entity_id]) {
       lxStates[entity_id].attributes = lxStates[entity_id].attributes || {}
@@ -2490,11 +2498,23 @@
             onchange="lxSetColorTemp('${id}',+this.value)">
           <div class="lx-slider-val">${ct}</div></div>`
       }
-      if (hasColor && curColor) {
+      if (hasColor) {
+        const hsArr = lxStates[id]?.attributes?.hs_color || [0, 100]
+        const curH = Math.round(hsArr[0]), curS = Math.round(hsArr[1])
+        const eid2 = id.replace(/[.\-]/g, '_')
         sliders += `<div class="lx-slider-row">
-          <div class="lx-slider-label">Color</div>
-          <div class="lx-color-swatch" style="background:${curColor};width:32px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);flex-shrink:0"></div>
-          <div class="lx-slider-val" style="color:${curColor}">${curColor.startsWith('hsl') ? Math.round(lxStates[id]?.attributes?.hs_color?.[0] ?? 0)+'°' : ''}</div></div>`
+          <div class="lx-slider-label">Hue</div>
+          <input type="range" class="lx-slider lx-hue-slider" id="lxh_${eid2}" min="0" max="360" value="${curH}"
+            style="background:linear-gradient(to right,hsl(0,100%,50%),hsl(60,100%,50%),hsl(120,100%,50%),hsl(180,100%,50%),hsl(240,100%,50%),hsl(300,100%,50%),hsl(360,100%,50%))"
+            oninput="this.nextElementSibling.textContent=this.value+'°'"
+            onchange="lxSetColor('${id}',+this.value,+(document.getElementById('lxs_${eid2}')||{value:${curS}}).value)">
+          <div class="lx-slider-val">${curH}°</div></div>`
+        sliders += `<div class="lx-slider-row">
+          <div class="lx-slider-label">Sat</div>
+          <input type="range" class="lx-slider" id="lxs_${eid2}" min="0" max="100" value="${curS}"
+            oninput="this.nextElementSibling.textContent=this.value+'%'"
+            onchange="lxSetColor('${id}',+(document.getElementById('lxh_${eid2}')||{value:${curH}}).value,+this.value)">
+          <div class="lx-slider-val">${curS}%</div></div>`
       }
       sliders += '</div>'
     }
@@ -2558,6 +2578,7 @@
   window.lxToggleAll    = lxToggleAll
   window.lxSetBrightness = lxSetBrightness
   window.lxSetColorTemp  = lxSetColorTemp
+  window.lxSetColor      = lxSetColor
   window.lxOpenRoom     = lxOpenRoom
   window.lxBack         = lxBack
 
