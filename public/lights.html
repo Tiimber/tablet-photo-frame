@@ -112,8 +112,6 @@
         let entityToCfgs = {};
         // cfg.name → THREE light object(s)
         let cfgToLights = {};
-        // cfg.name → array of cone mesh objects (light ray visuals)
-        let cfgToConeMeshes = {};
         // rainbow light THREE.PointLight reference for animation
         let rainbowLight3d = null;
         let rainbowHue = 0;
@@ -268,14 +266,6 @@
                     lObj.intensity = (cfg.maxIntensity * 1.5) * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER;
                 } else if (cfg.type === 'led') {
                     lObj.intensity = cfg.maxIntensity * brightFrac * GLOBAL_BRIGHTNESS_MULTIPLIER * 2.0;
-                }
-            }
-            // Update cone mesh visuals
-            const cones = cfgToConeMeshes[cfg.name];
-            if (cones) {
-                for (const cm of cones) {
-                    cm.visible = isOn;
-                    if (isOn) cm.material.color.copy(color);
                 }
             }
         }
@@ -549,28 +539,6 @@
                         if (!cfgToLights[cfg.name]) cfgToLights[cfg.name] = [];
                         cfgToLights[cfg.name].push(light3d2);
                     }
-                    // Cone ray visuals for all spot params
-                    if (!cfgToConeMeshes[cfg.name]) cfgToConeMeshes[cfg.name] = [];
-                    const _addConeMesh = (sp) => {
-                        const coneLen = 300, coneRad = Math.tan(sp.angle * Math.PI / 180) * coneLen;
-                        const coneGeo = new THREE.ConeGeometry(coneRad, coneLen, 16, 1, true);
-                        const coneMat = new THREE.MeshBasicMaterial({ color: 0xfff5d6, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
-                        const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-                        // ConeGeometry points up (+Y); rotate so it points along beam direction
-                        const pRad = sp.pitch * Math.PI / 180, yRad = sp.yaw * Math.PI / 180;
-                        const dir = new THREE.Vector3(Math.sin(yRad) * Math.cos(pRad), Math.sin(pRad), Math.cos(yRad) * Math.cos(pRad)).normalize();
-                        const up = new THREE.Vector3(0, 1, 0);
-                        const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
-                        coneMesh.quaternion.copy(quat);
-                        // Offset so apex is at light position, cone extends along beam
-                        coneMesh.position.set(cfg.coords.x + dir.x * coneLen / 2, cfg.coords.y + dir.y * coneLen / 2, cfg.coords.z + dir.z * coneLen / 2);
-                        coneMesh.visible = false;
-                        coneMesh.renderOrder = 10;
-                        targetGroup.add(coneMesh);
-                        cfgToConeMeshes[cfg.name].push(coneMesh);
-                    };
-                    _addConeMesh(sParams);
-                    if (cfg.spotParams2) _addConeMesh(cfg.spotParams2);
                 } else if (cfg.type === 'led') {
                     const lParams = cfg.ledParams || { length: 150, spacing: 15 };
                     light3d = new THREE.PointLight(0xffe0a3, cfg.maxIntensity * GLOBAL_BRIGHTNESS_MULTIPLIER * 2.0, lParams.length * 2.0, 0.5);
