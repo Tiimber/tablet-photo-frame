@@ -75,27 +75,27 @@
         // ── Static 3D light config library ──────────────────────────────────────
         // "haKey" = room name fragment + light name fragment from lights.json (lowercase, used for matching)
         const HOME_LIGHTS_CONFIG_LIBRARY = [
-          { name: "Living room - rainbow light",      haRoom: "living room", haLight: "rainbow",    type: "point", maxIntensity: 0.50, floor: "bottom", coords: { x: 618.3, y: 167.0, z: 338.9 }, params: {}, hardcodedEntityId: 'switch.rainbow_light_plug', rainbow: true, bounds: { x: [370, 850], z: [0, 680] } },
-          { name: "Living room - computer lights",    haRoom: "living room", haLight: "computer",   type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 532.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 }, bounds: { x: [370, 850], z: [0, 680] } },
-          { name: "Living room - massage lights",     haRoom: "living room", haLight: "massage",    type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 166.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 }, bounds: { x: [370, 850], z: [0, 680] } },
-          { name: "Kitchen - table light",            haRoom: "kitchen",     haLight: "table",      type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 465.0, y: 253.0, z: 40.2  }, spotParams: { angle: 85, pitch: -90, yaw: -180 }, bounds: { x: [130, 600], z: [-80, 350] } },
-          { name: "Kitchen - ceiling",                haRoom: "kitchen",     haLight: "ceiling",    type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 230.0, y: 253.0, z: 166.2 }, params: {}, bounds: { x: [130, 600], z: [-80, 350] } },
-          { name: "Bedroom - ceiling",                haRoom: "bedroom",     haLight: "",           type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 163.0, y: 253.0, z: 495.2 }, params: {}, bounds: { x: [-80, 370], z: [350, 680] } },
-          { name: "Walk in closet - ceiling",         haRoom: "walk in closet", haLight: "",        type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 408.2 }, params: {}, bounds: { x: [370, 600], z: [350, 580] } },
-          { name: "Entrance - ceiling",               haRoom: "entrance",    haLight: "front",      type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 579.2 }, params: {}, bounds: { x: [370, 600], z: [500, 720] } },
-          { name: "Back entrance - ceiling",          haRoom: "entrance",    haLight: "back",       type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 270.0, y: 253.0, z: -170.8 }, params: {}, bounds: { x: [130, 400], z: [-320, -80] } },
-          { name: "Stairways - lower ceiling",        haRoom: "stairway",    haLight: "lower",      type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 39.0,  y: 253.0, z: 54.2  }, params: {}, bounds: { x: [-80, 130], z: [-80, 200] } },
-          { name: "Garage - wall right",              haRoom: "garage",      haLight: "",           type: "spot",  maxIntensity: 0.35, floor: "bottom", coords: { x: -132.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 }, bounds: { x: [-320, -80], z: [-80, 200] } },
-          { name: "Garage - wall left",               haRoom: "garage",      haLight: "",           type: "spot",  maxIntensity: 0.35, floor: "bottom", coords: { x: -262.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 }, bounds: { x: [-320, -80], z: [-80, 200] } },
-          { name: "Bathroom - spot1 (TL)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 18.0,  y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 }, bounds: { x: [-80, 160], z: [-320, -80] } },
-          { name: "Bathroom - spot2 (TR)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 }, bounds: { x: [-80, 160], z: [-320, -80] } },
-          { name: "Bathroom - spot3 (L)",             haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 18.0,  y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 }, bounds: { x: [-80, 160], z: [-320, -80] } },
-          { name: "Bathroom - spot4 (R)",             haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 }, bounds: { x: [-80, 160], z: [-320, -80] } },
-          { name: "Bathroom - spot5 (BL)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 18.0,  y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 }, bounds: { x: [-80, 160], z: [-320, -80] } },
-          { name: "Bathroom - spot6 (BR)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 }, bounds: { x: [-80, 160], z: [-320, -80] } },
-          { name: "Laundry room - ceiling",           haRoom: "laundry room", haLight: "",          type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: -217.0, y: 253.0, z: -170.8 }, params: {}, bounds: { x: [-320, -80], z: [-320, -80] } },
-          { name: "Exercise room - ceiling",          haRoom: "exercise room", haLight: "",         type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: -217.0, y: 241.0, z: -592.8 }, params: {}, bounds: { x: [-320, -80], z: [-800, -320] } },
-          { name: "Play room - ceiling",              haRoom: "play room",   haLight: "",           type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: -217.0, y: 262.0, z: -1061.8 }, params: {}, bounds: { x: [-320, -80], z: [-1300, -800] } },
+          { name: "Living room - rainbow light",      haRoom: "living room", haLight: "rainbow",    type: "point", maxIntensity: 0.50, floor: "bottom", coords: { x: 618.3, y: 167.0, z: 338.9 }, params: {}, hardcodedEntityId: 'switch.rainbow_light_plug', rainbow: true },
+          { name: "Living room - computer lights",    haRoom: "living room", haLight: "computer",   type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 532.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
+          { name: "Living room - massage lights",     haRoom: "living room", haLight: "massage",    type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 767.0, y: 253.0, z: 166.2 }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
+          { name: "Kitchen - table light",            haRoom: "kitchen",     haLight: "table",      type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 465.0, y: 253.0, z: 40.2  }, spotParams: { angle: 85, pitch: -90, yaw: -180 } },
+          { name: "Kitchen - ceiling",                haRoom: "kitchen",     haLight: "ceiling",    type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 230.0, y: 253.0, z: 166.2 }, params: {} },
+          { name: "Bedroom - ceiling",                haRoom: "bedroom",     haLight: "",           type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 163.0, y: 253.0, z: 495.2 }, params: {} },
+          { name: "Walk in closet - ceiling",         haRoom: "walk in closet", haLight: "",        type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 408.2 }, params: {} },
+          { name: "Entrance - ceiling",               haRoom: "entrance",    haLight: "front",      type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 470.0, y: 253.0, z: 579.2 }, params: {} },
+          { name: "Back entrance - ceiling",          haRoom: "entrance",    haLight: "back",       type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 270.0, y: 253.0, z: -170.8 }, params: {} },
+          { name: "Stairways - lower ceiling",        haRoom: "stairway",    haLight: "lower",      type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: 39.0,  y: 253.0, z: 54.2  }, params: {} },
+          { name: "Garage - wall right",              haRoom: "garage",      haLight: "",           type: "spot",  maxIntensity: 0.35, floor: "bottom", coords: { x: -132.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 } },
+          { name: "Garage - wall left",               haRoom: "garage",      haLight: "",           type: "spot",  maxIntensity: 0.35, floor: "bottom", coords: { x: -262.5, y: 203.6, z: 47.5 }, spotParams: { angle: 85, pitch: 0, yaw: 0 } },
+          { name: "Bathroom - spot1 (TL)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 18.0,  y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot2 (TR)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -247.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot3 (L)",             haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 18.0,  y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot4 (R)",             haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -192.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot5 (BL)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 18.0,  y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Bathroom - spot6 (BR)",            haRoom: "bathroom",    haLight: "",           type: "spot",  maxIntensity: 1.00, floor: "bottom", coords: { x: 106.0, y: 253.0, z: -137.8 }, spotParams: { angle: 40, pitch: -90, yaw: -180 } },
+          { name: "Laundry room - ceiling",           haRoom: "laundry room", haLight: "",          type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: -217.0, y: 253.0, z: -170.8 }, params: {} },
+          { name: "Exercise room - ceiling",          haRoom: "exercise room", haLight: "",         type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: -217.0, y: 241.0, z: -592.8 }, params: {} },
+          { name: "Play room - ceiling",              haRoom: "play room",   haLight: "",           type: "point", maxIntensity: 0.80, floor: "bottom", coords: { x: -217.0, y: 262.0, z: -1061.8 }, params: {} },
           { name: "Stairway - upper wall",            haRoom: "stairway",    haLight: "upper",      type: "point", maxIntensity: 1.50, floor: "top",    coords: { x: -0.9,  y: 401.8, z: 245.0 }, params: {} },
           { name: "Upstairs lobby - LED left",        haRoom: "upstairs lobby", haLight: "",        type: "led",   maxIntensity: 0.80, floor: "top",    coords: { x: 230.7, y: 453.2, z: 277.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
           { name: "Upstairs lobby - LED right",       haRoom: "upstairs lobby", haLight: "",        type: "led",   maxIntensity: 0.80, floor: "top",    coords: { x: 230.7, y: 453.2, z: 413.4 }, ledParams: { length: 443, spacing: 20, yawRad: -90, pitchRad: -90 } },
@@ -529,21 +529,11 @@
                     scene.add(targetGroup); compiledActiveSceneLights.push(targetGroup);
                 }
 
-                // Compute effective distance from bounds if provided
-                function boundsDistance(cfg, defaultDist) {
-                    if (!cfg.bounds) return defaultDist;
-                    const bx = cfg.bounds.x, bz = cfg.bounds.z;
-                    const halfX = bx ? Math.min(cfg.coords.x - bx[0], bx[1] - cfg.coords.x) : defaultDist;
-                    const halfZ = bz ? Math.min(cfg.coords.z - bz[0], bz[1] - cfg.coords.z) : defaultDist;
-                    return Math.min(halfX, halfZ, defaultDist);
-                }
-
                 // Create the actual THREE light and register it
                 let light3d = null;
                 if (cfg.type === 'point') {
-                    const dist = boundsDistance(cfg, 1500);
                     // Use SpotLight pointing down — PointLights often don't illuminate scene geometry reliably
-                    light3d = new THREE.SpotLight(0xffe0a3, cfg.maxIntensity * 2.0 * GLOBAL_BRIGHTNESS_MULTIPLIER, dist, 80 * (Math.PI/180), 0.6, 0);
+                    light3d = new THREE.SpotLight(0xffe0a3, cfg.maxIntensity * 2.0 * GLOBAL_BRIGHTNESS_MULTIPLIER, 1500, 80 * (Math.PI/180), 0.6, 0);
                     light3d.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
                     light3d.visible = false;
                     const tDown = new THREE.Object3D();
@@ -553,8 +543,7 @@
                     if (cfg.rainbow) rainbowLight3d = light3d;
                 } else if (cfg.type === 'spot') {
                     const sParams = cfg.spotParams || { angle: 45, pitch: -90, yaw: 0 };
-                    const dist = boundsDistance(cfg, 3000);
-                    light3d = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 2.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, dist, sParams.angle * (Math.PI / 180), 0.1, 0);
+                    light3d = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 2.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sParams.angle * (Math.PI / 180), 0.1, 0);
                     light3d.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
                     light3d.visible = false;
                     const pitchRad = sParams.pitch * (Math.PI / 180), yawRad = sParams.yaw * (Math.PI / 180), ld = 150;
@@ -564,7 +553,7 @@
                     targetGroup.add(light3d);
                     if (cfg.spotParams2) {
                         const sP2 = cfg.spotParams2;
-                        const light3d2 = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 2.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, dist, sP2.angle * (Math.PI / 180), 0.1, 0);
+                        const light3d2 = new THREE.SpotLight(0xfff5d6, (cfg.maxIntensity * 2.5) * GLOBAL_BRIGHTNESS_MULTIPLIER, 3000, sP2.angle * (Math.PI / 180), 0.1, 0);
                         light3d2.position.set(cfg.coords.x, cfg.coords.y, cfg.coords.z);
                         light3d2.visible = false;
                         const p2 = sP2.pitch * (Math.PI / 180), y2 = sP2.yaw * (Math.PI / 180);
