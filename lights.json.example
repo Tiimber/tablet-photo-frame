@@ -37,7 +37,7 @@
     {
       "name": "Bathroom",
       "lights": [
-        { "entity_id": "light.spotlights", "name": "Lights" }
+        { "entity_id": "light.spotlights_2", "name": "Lights" }
       ]
     },
     {
@@ -80,7 +80,7 @@
     {
       "name": "Garage",
       "lights": [
-        { "entity_id": "switch.garage_lights_socket", "name": "Lights" }
+        { "entity_id": "light.tapo_garage_floodlight_timed", "name": "Lights" }
       ]
     },
     {

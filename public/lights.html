@@ -270,15 +270,6 @@
 
         function applyAllHAStates() {
             for (const cfg of HOME_LIGHTS_CONFIG_LIBRARY) applyHAStateToCfg(cfg);
-            // Debug: show entity→state summary in astro readout
-            const lines = HOME_LIGHTS_CONFIG_LIBRARY.map(cfg => {
-                const id = cfg._entityId;
-                const st = id ? haStates[id] : null;
-                const lights3d = cfgToLights[cfg.name] || [];
-                const vis = lights3d.length > 0 ? lights3d[0].visible : '?';
-                return `${cfg.name.split(' - ')[0].substring(0,8)}: id=${id ? id.split('.')[1].substring(0,12) : 'NONE'} st=${st ? st.state : 'null'} vis=${vis}`;
-            });
-            document.getElementById('astro-status').innerText = lines.join('\n');
         }
 
         // ── HA fetch ─────────────────────────────────────────────────────────────
