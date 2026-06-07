@@ -2593,10 +2593,8 @@
     document.getElementById('lx-simple-view').classList.toggle('hidden', tab !== 'simple')
     document.getElementById('lx-map-view').classList.toggle('active', tab === 'map')
     const iframe = document.getElementById('lx-map-iframe')
-    if (tab === 'map') {
-      if (!iframe.src || iframe.src === window.location.href) iframe.src = '/lights.html'
-    } else {
-      iframe.src = ''
+    if (tab === 'map' && (!iframe.src || iframe.src === window.location.href)) {
+      iframe.src = '/lights.html'
     }
     if (tab === 'simple') lxInit().then(() => lxFetchAllRoomStates()).then(() => lxRenderRooms())
   }
