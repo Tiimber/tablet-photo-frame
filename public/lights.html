@@ -13,7 +13,7 @@
         .astro-readout { position: absolute; bottom: 25px; left: 25px; font-family: monospace; font-size: 11px; color: #666; background: rgba(10,10,10,0.6); padding: 6px 12px; border-radius: 6px; pointer-events: none; z-index: 100; border: 1px solid #222; }
 
         /* ── Light popup ── */
-        #lp-backdrop { display: none; position: absolute; inset: 0; z-index: 200; }
+        #lp-backdrop { display: none; position: absolute; inset: 0; z-index: 200; pointer-events: none; }
         #lp-backdrop.open { display: block; }
         #lp-popup {
             position: absolute; z-index: 201; min-width: 220px; max-width: 280px;
@@ -635,11 +635,20 @@
                 body: JSON.stringify({ domain: 'light', service: 'turn_on', data: { entity_id: id, hs_color: [hue, sat] } }) });
         }
 
-        document.getElementById('lp-backdrop').addEventListener('pointerdown', (e) => {
+        // Outside-click: listen on container, close if tap is outside popup
+        document.getElementById('dashboard-container').addEventListener('pointerdown', (e) => {
+            if (!popupEntityId) return;
             const popup = document.getElementById('lp-popup');
             const rect = popup.getBoundingClientRect();
             if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) lpClose();
-        });
+        }, true); // capture phase so it fires before canvas handlers
+
+        // Expose popup functions to global scope (needed for inline onclick/onchange in injected HTML)
+        window.lpToggle = lpToggle;
+        window.lpClose = lpClose;
+        window.lpSetBrightness = lpSetBrightness;
+        window.lpSetColorTemp = lpSetColorTemp;
+        window.lpSetColor = lpSetColor;
 
         // ── Tap / hold handler ────────────────────────────────────────────────────
 
@@ -679,7 +688,7 @@
         }
 
         renderer.domElement.addEventListener('pointerdown', (event) => {
-            if (popupEntityId) return;
+            if (popupEntityId) { lpClose(); return; }
             pointerDownTime = Date.now();
             pointerDownPos = { x: event.clientX, y: event.clientY };
             didHold = false;
