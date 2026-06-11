@@ -1330,7 +1330,8 @@
     item.className = 'media-item'
     if (info.isVideo) {
       const v = document.createElement('video')
-      v.muted = !withSound; v.playsInline = true; v.loop = true
+      // Always start muted to satisfy autoplay policy, then unmute if withSound
+      v.muted = true; v.playsInline = true; v.loop = true
       if (withSound) v.volume = 1
       if (info.h > info.w) v.classList.add('portrait')
       v.src = '/photos/' + encodeURIComponent(fn)
@@ -1346,7 +1347,10 @@
       const startVideo = () => {
         const safeWindow = Math.max(0, info.duration - 2)
         v.currentTime = safeWindow > 1 ? Math.random() * safeWindow : 0
-        v.play().catch(() => {})
+        v.play().then(() => {
+          // Unmute after playback starts — avoids autoplay block
+          if (withSound) { v.muted = false; v.volume = 1 }
+        }).catch(() => {})
         // Fade out poster once video is playing
         v.addEventListener('playing', () => { poster.classList.add('hidden') }, { once: true })
       }
