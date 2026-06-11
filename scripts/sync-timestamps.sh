@@ -48,10 +48,11 @@ for remote_path in "${SERVER_FILES[@]}"; do
 
   # Extract creation timestamp from local file
   # Prefer com.apple.quicktime.creationdate (has timezone), fall back to creation_time (UTC)
+  # csv=p=0 outputs both tags comma-separated on one line; take the first field
   ts=$(ffprobe -v error \
     -show_entries format_tags=com.apple.quicktime.creationdate,creation_time \
-    -of default=noprint_wrappers=1:nokey=1 \
-    "$local_src" 2>/dev/null | head -1 | tr -d '[:space:]')
+    -of csv=p=0 \
+    "$local_src" 2>/dev/null | awk -F',' 'NF{print $1; exit}' || true)
 
   if [[ -z "$ts" ]]; then
     echo "  [NO TS]     $stem — no timestamp in local file"
@@ -59,25 +60,12 @@ for remote_path in "${SERVER_FILES[@]}"; do
     continue
   fi
 
-  # Normalize to UTC ISO8601 for creation_time tag
-  # com.apple.quicktime.creationdate may be like 2022-06-21T13:11:04+0200
-  # ffmpeg creation_time expects UTC: 2022-06-21T11:11:04Z
-  # Use python3 to parse and convert
-  ts_utc=$(python3 -c "
-from datetime import datetime, timezone
-import sys
-s = '$ts'
-# Try parsing with timezone offset
-for fmt in ('%Y-%m-%dT%H:%M:%S%z', '%Y-%m-%dT%H:%M:%S.%f%z', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%M:%S.%fZ'):
-    try:
-        dt = datetime.strptime(s, fmt)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        print(dt.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
-        sys.exit(0)
-    except: pass
-print(s)
-" 2>/dev/null)
+  # ts is already UTC (creation_time tag from source file, e.g. 2022-05-10T08:10:07.000000Z)
+  # Strip microseconds: 2022-05-10T08:10:07.000000Z → 2022-05-10T08:10:07Z
+  ts_utc="${ts%.000000Z}"
+  [[ "$ts_utc" != "$ts" ]] && ts_utc="${ts_utc}Z"
+  # Strip any trailing whitespace/newlines
+  ts_utc="${ts_utc%%[[:space:]]*}"
 
   if [[ -z "$ts_utc" ]]; then
     echo "  [BAD TS]    $stem — could not parse timestamp: $ts"
@@ -91,17 +79,23 @@ print(s)
 
   existing_ts=$(ffprobe -v error \
     -show_entries format_tags=creation_time \
-    -of default=noprint_wrappers=1:nokey=1 \
-    "$server_tmp" 2>/dev/null | tr -d '[:space:]')
+    -of csv=p=0 \
+    "$server_tmp" 2>/dev/null | awk 'NF{print $1; exit}' || true)
 
-  if [[ "$existing_ts" == "$ts_utc" ]]; then
-    echo "  [OK]        $stem — already has correct timestamp ($ts_utc)"
+  # Normalize existing_ts: strip microseconds suffix (.000000Z → Z)
+  existing_ts_norm="${existing_ts%.000000Z}"
+  [[ "$existing_ts_norm" != "$existing_ts" ]] && existing_ts_norm="${existing_ts_norm}Z"
+  ts_utc_norm="${ts_utc%.000000Z}"
+  [[ "$ts_utc_norm" != "$ts_utc" ]] && ts_utc_norm="${ts_utc_norm}Z"
+
+  if [[ "$existing_ts_norm" == "$ts_utc_norm" ]]; then
+    echo "  [OK]        $stem — already has correct timestamp ($existing_ts)"
     (( SKIPPED++ )) || true
     continue
   fi
 
   echo "  [SYNCING]   $stem"
-  echo "              $existing_ts → $ts_utc"
+  echo "              ${existing_ts:-<none>} → $ts_utc"
 
   out_tmp="$TMP_DIR/out_${server_name}"
 
