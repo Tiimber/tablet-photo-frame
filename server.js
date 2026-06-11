@@ -266,7 +266,8 @@ function processQueue() {
         '-vf', "scale=w='min(iw,1920)':h='min(ih,1080)':force_original_aspect_ratio=decrease," +
                "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         '-c:v', 'libx264', '-crf', '26', '-preset', 'fast',
-        '-an', '-movflags', '+faststart',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-movflags', '+faststart',
         '-progress', 'pipe:1',
         '-y', outPath
       ])
