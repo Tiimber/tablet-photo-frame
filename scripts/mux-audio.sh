@@ -78,6 +78,7 @@ for remote_path in "${SERVER_FILES[@]}"; do
     -i "$server_tmp" \
     -i "$local_src" \
     -map 0:v:0 -map 1:a:0 \
+    -map_metadata 0 \
     -c:v copy \
     -c:a aac -b:a 128k \
     -shortest \

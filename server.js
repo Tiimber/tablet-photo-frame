@@ -736,6 +736,7 @@ app.post('/api/trim/:filename', (req, res) => {
     '-i', srcPath,
     '-t', String(end - start),
     '-c', 'copy',
+    '-map_metadata', '0',
     '-movflags', '+faststart',
     '-y', tmpPath
   ])
