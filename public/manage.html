@@ -410,8 +410,11 @@
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 200;
+    z-index: 1000;
     cursor: zoom-out;
+    /* Force own compositing layer so GPU-accelerated videos don't render above */
+    transform: translateZ(0);
+    isolation: isolate;
   }
   #lightbox.open { display: flex; }
   #lightbox img, #lightbox video {
