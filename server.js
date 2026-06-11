@@ -696,6 +696,59 @@ app.patch('/api/meta/:filename', (req, res) => {
   res.json({ ok: true })
 })
 
+app.patch('/api/photos/:filename/date', (req, res) => {
+  const filename = path.basename(req.params.filename)
+  const filePath = path.join(PHOTOS_DIR, filename)
+  const ext      = path.extname(filename).toLowerCase()
+  if (!MEDIA_EXTS.has(ext)) return res.status(400).json({ error: 'Unsupported file type' })
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' })
+
+  const { date } = req.body  // expects "YYYY-MM-DD"
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return res.status(400).json({ error: 'date must be YYYY-MM-DD' })
+
+  if (VIDEO_EXTS.has(ext)) {
+    // Videos: remux with updated creation_time (noon UTC on that date)
+    const isoTs = date + 'T12:00:00Z'
+    const tmpPath = filePath + '.dateTmp.mp4'
+    const ff = spawn('ffmpeg', [
+      '-i', filePath,
+      '-c', 'copy',
+      '-map_metadata', '0',
+      '-metadata', 'creation_time=' + isoTs,
+      '-movflags', '+faststart',
+      '-y', tmpPath
+    ])
+    let errTail = ''
+    ff.stderr.on('data', d => { errTail = (errTail + d.toString()).slice(-1000) })
+    ff.on('close', code => {
+      if (code !== 0) {
+        try { fs.unlinkSync(tmpPath) } catch {}
+        return res.status(500).json({ error: 'ffmpeg failed', detail: errTail.slice(-200) })
+      }
+      try { fs.renameSync(tmpPath, filePath) } catch (e) {
+        try { fs.unlinkSync(tmpPath) } catch {}
+        return res.status(500).json({ error: 'rename failed' })
+      }
+      res.json({ ok: true, date })
+    })
+  } else {
+    // Images: write EXIF date tags via exiftool
+    const exifDate = date.replace(/-/g, ':') + ' 12:00:00'
+    const et = spawn('exiftool', [
+      '-DateTimeOriginal=' + exifDate,
+      '-CreateDate=' + exifDate,
+      '-ModifyDate=' + exifDate,
+      '-overwrite_original', '-q', filePath
+    ])
+    let errTail = ''
+    et.stderr.on('data', d => { errTail = (errTail + d.toString()).slice(-500) })
+    et.on('close', code => {
+      if (code !== 0) return res.status(500).json({ error: 'exiftool failed', detail: errTail.slice(-200) })
+      res.json({ ok: true, date })
+    })
+  }
+})
+
 app.delete('/api/photos/:filename', (req, res) => {
   const filename = path.basename(req.params.filename)
   const filePath = path.join(PHOTOS_DIR, filename)

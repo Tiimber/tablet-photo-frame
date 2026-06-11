@@ -306,6 +306,37 @@
   #lb-trim-save:hover:not(:disabled) { background: #0f3457; }
   #lb-trim-save:disabled { opacity: 0.35; cursor: default; }
 
+  /* Date edit row in lightbox */
+  #lb-date-row {
+    display: none;
+    position: absolute;
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    align-items: center;
+    gap: 8px;
+    z-index: 1002;
+    background: rgba(8,8,8,0.82);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+  #lightbox.open #lb-date-row { display: flex; }
+  #lightbox.trimming #lb-date-row { bottom: 110px; }
+  #lb-date-row label { font-size: 0.78rem; color: #888; }
+  #lb-date-input {
+    background: #1e1e1e; border: 1px solid #444; border-radius: 5px;
+    color: #ddd; font-size: 0.82rem; padding: 4px 8px; outline: none;
+    color-scheme: dark;
+  }
+  #lb-date-input:focus { border-color: #4a9eff; }
+  #lb-date-save {
+    padding: 4px 12px; border-radius: 5px; border: 1px solid #2d7abf;
+    background: #0d2a45; color: #5aadff; font-size: 0.78rem; cursor: pointer;
+  }
+  #lb-date-save:hover { background: #0f3457; }
+  #lb-date-save:disabled { opacity: 0.4; cursor: default; }
+
   /* Library header */
   #lib-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
   #count { color: #666; font-size: 0.85rem; }
@@ -410,10 +441,18 @@
     font-size: 0.78rem;
   }
 
-  #lb-show-slideshow {
+  #lb-slideshow-btns {
     position: absolute;
     top: 16px; left: 50%;
     transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 1002;
+    white-space: nowrap;
+  }
+  #lb-show-slideshow,
+  #lb-play-slideshow,
+  #lb-play-slideshow-sound {
     padding: 10px 20px;
     background: rgba(0, 150, 255, 0.9);
     color: white;
@@ -422,14 +461,17 @@
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
-    z-index: 1002;
     transition: background 0.2s;
   }
-  #lb-show-slideshow:hover {
+  #lb-show-slideshow:hover,
+  #lb-play-slideshow:hover {
     background: rgba(0, 180, 255, 1);
   }
-  #lightbox.trimming #lb-show-slideshow {
-    display: none;
+  #lb-play-slideshow-sound {
+    background: rgba(0, 180, 80, 0.9);
+  }
+  #lb-play-slideshow-sound:hover {
+    background: rgba(0, 210, 100, 1);
   }
 
   /* ── Toolbar ── */
@@ -698,7 +740,9 @@
       font-size: 2rem;
     }
     
-    #lb-show-slideshow {
+    #lb-show-slideshow,
+    #lb-play-slideshow,
+    #lb-play-slideshow-sound {
       font-size: 1rem;
       padding: 12px 24px;
       min-height: 44px;
@@ -857,7 +901,16 @@
   <img id="lb-img" src="" alt="">
   <video id="lb-vid" controls autoplay muted playsinline></video>
   <div id="lightbox-name"></div>
-  <button id="lb-show-slideshow" title="Show this image on the slideshow">▶ Show on Slideshow</button>
+  <div id="lb-date-row">
+    <label for="lb-date-input">Date</label>
+    <input type="date" id="lb-date-input">
+    <button id="lb-date-save">Save</button>
+  </div>
+  <div id="lb-slideshow-btns">
+    <button id="lb-show-slideshow" title="Show this image on the slideshow">▶ Show on Slideshow</button>
+    <button id="lb-play-slideshow" title="Play this video on the slideshow (muted)">▶ Play on Slideshow</button>
+    <button id="lb-play-slideshow-sound" title="Play this video on the slideshow with sound">🔊 Play with Sound</button>
+  </div>
   <div id="lb-trim">
     <div id="lb-trim-timeline">
       <div id="lb-trim-track"></div>
@@ -1445,9 +1498,11 @@
   const lbVid     = document.getElementById('lb-vid')
   const lbClose   = document.getElementById('lightbox-close')
   const lbNameEl  = document.getElementById('lightbox-name')
-  const lbShowSlideshow = document.getElementById('lb-show-slideshow')
-  
-  let sentToSlideshow = false  // Track if we sent image to slideshow
+  const lbShowSlideshow      = document.getElementById('lb-show-slideshow')
+  const lbPlaySlideshow      = document.getElementById('lb-play-slideshow')
+  const lbPlaySlideshowSound = document.getElementById('lb-play-slideshow-sound')
+
+  let sentToSlideshow = false  // Track if we sent media to slideshow
   const lbTrimPanel   = document.getElementById('lb-trim')
   const lbTrimTimeline = document.getElementById('lb-trim-timeline')
   const lbTrimTrack   = document.getElementById('lb-trim-track')
@@ -1459,6 +1514,8 @@
   const lbSetStart    = document.getElementById('lb-set-start')
   const lbSetEnd      = document.getElementById('lb-set-end')
   const lbTrimSave    = document.getElementById('lb-trim-save')
+  const lbDateInput   = document.getElementById('lb-date-input')
+  const lbDateSave    = document.getElementById('lb-date-save')
 
   let trimStart = 0, trimEnd = 0, trimDuration = 0, trimFilename = ''
   let draggingHandle = null
@@ -1566,6 +1623,10 @@
     lbImg.style.display = isVid ? 'none' : ''
     lbVid.style.display = isVid ? '' : 'none'
     lbNameEl.textContent = name
+    // Show correct buttons: image gets "Show on Slideshow"; video gets two play buttons
+    lbShowSlideshow.style.display      = isVid ? 'none' : ''
+    lbPlaySlideshow.style.display      = isVid ? '' : 'none'
+    lbPlaySlideshowSound.style.display = isVid ? '' : 'none'
     if (isVid) {
       trimFilename = name; trimStart = 0; trimEnd = 0; trimDuration = 0
       lbTrimSave.textContent = 'Trim & Save'; lbTrimSave.disabled = true
@@ -1576,6 +1637,14 @@
       lbImg.src = '/photos/' + encodeURIComponent(name)
       lightbox.classList.remove('trimming')
     }
+    // Fetch current date for this file
+    lbDateInput.value = ''
+    lbDateSave.disabled = false
+    lbDateSave.textContent = 'Save'
+    fetch('/api/photos/' + encodeURIComponent(name) + '/info')
+      .then(r => r.json())
+      .then(info => { if (info.date) lbDateInput.value = info.date })
+      .catch(() => {})
     lightbox.classList.add('open')
     document.addEventListener('keydown', onLbKey)
   }
@@ -1598,36 +1667,57 @@
   lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox() })
   lbClose.addEventListener('click', closeLightbox)
 
-  lbShowSlideshow.addEventListener('click', async () => {
+  async function sendToSlideshow(btn, withSound) {
     const name = lbNameEl.textContent
     if (!name) return
-
-    const origText = lbShowSlideshow.textContent
-    lbShowSlideshow.disabled = true
-    lbShowSlideshow.textContent = 'Sending...'
-
+    const origText = btn.textContent
+    btn.disabled = true
+    btn.textContent = 'Sending...'
     try {
       const res = await fetch('/api/show-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: name })
+        body: JSON.stringify({ filename: name, withSound: !!withSound })
       })
-      if (res.ok) {
-        sentToSlideshow = true
-        lbShowSlideshow.textContent = '✓ Sent!'
-        setTimeout(() => {
-          lbShowSlideshow.textContent = origText
-          lbShowSlideshow.disabled = false
-        }, 1500)
-      } else {
-        throw new Error('Failed to send')
-      }
+      if (!res.ok) throw new Error('Failed to send')
+      sentToSlideshow = true
+      btn.textContent = '✓ Sent!'
+      setTimeout(() => { btn.textContent = origText; btn.disabled = false }, 1500)
     } catch (e) {
-      lbShowSlideshow.textContent = '✗ Failed: ' + e.message
-      setTimeout(() => {
-        lbShowSlideshow.textContent = origText
-        lbShowSlideshow.disabled = false
-      }, 2000)
+      btn.textContent = '✗ Failed'
+      setTimeout(() => { btn.textContent = origText; btn.disabled = false }, 2000)
+    }
+  }
+
+  lbShowSlideshow.addEventListener('click',      () => sendToSlideshow(lbShowSlideshow, false))
+  lbPlaySlideshow.addEventListener('click',      () => sendToSlideshow(lbPlaySlideshow, false))
+  lbPlaySlideshowSound.addEventListener('click', () => sendToSlideshow(lbPlaySlideshowSound, true))
+
+  lbDateSave.addEventListener('click', async () => {
+    const name = lbNameEl.textContent
+    const date = lbDateInput.value
+    if (!name || !date) return
+    lbDateSave.disabled = true
+    lbDateSave.textContent = 'Saving…'
+    try {
+      const r = await fetch('/api/photos/' + encodeURIComponent(name) + '/date', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date })
+      })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j.error || 'Failed')
+      lbDateSave.textContent = 'Saved!'
+      // Update date spans in grid and list without full reload
+      document.querySelectorAll(`.thumb[data-name="${CSS.escape(name)}"] .photo-date`).forEach(el => { el.textContent = date })
+      document.querySelectorAll(`.list-row[data-name="${CSS.escape(name)}"] .lr-date`).forEach(el => { el.textContent = date })
+      // Update allFiles cache so sort-by-date works
+      const f = allFiles.find(x => x.name === name)
+      if (f) f.date = date
+      setTimeout(() => { lbDateSave.textContent = 'Save'; lbDateSave.disabled = false }, 1500)
+    } catch (err) {
+      lbDateSave.textContent = '✗ ' + err.message
+      setTimeout(() => { lbDateSave.textContent = 'Save'; lbDateSave.disabled = false }, 3000)
     }
   })
 
