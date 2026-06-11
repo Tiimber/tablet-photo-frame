@@ -340,6 +340,20 @@ app.get('/api/photos', (req, res) => {
       .sort()
       .map(f => ({ name: f, size: fs.statSync(path.join(PHOTOS_DIR, f)).size }))
     if (files.length === 0) return res.json([])
+    // Detect audio streams for video files
+    for (const f of files) {
+      if (VIDEO_EXTS.has(path.extname(f.name).toLowerCase())) {
+        try {
+          const probe = spawnSync('ffprobe', [
+            '-v', 'error', '-select_streams', 'a:0',
+            '-show_entries', 'stream=codec_type',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            path.join(PHOTOS_DIR, f.name)
+          ], { timeout: 5000 })
+          f.hasAudio = probe.status === 0 && probe.stdout.toString().trim().length > 0
+        } catch { f.hasAudio = false }
+      }
+    }
     // Batch-read EXIF dates (images only; videos keep their container date)
     try {
       const paths = files.map(f => path.join(PHOTOS_DIR, f.name))

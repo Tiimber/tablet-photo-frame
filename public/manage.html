@@ -1188,7 +1188,7 @@
     updateSelectionUI()
   }
 
-  function makeThumb(name, size, displayName, date) {
+  function makeThumb(name, size, displayName, date, hasAudio) {
     const isVid = VIDEO_RE.test(name)
     const div = document.createElement('div')
     div.className = 'thumb' + (selectedSet.has(name) ? ' selected' : '')
@@ -1210,7 +1210,13 @@
       })
       div.appendChild(v)
       const badge = document.createElement('div')
-      badge.className = 'video-badge'; badge.textContent = '▶ VIDEO'
+      badge.className = 'video-badge'
+      badge.textContent = '▶ VIDEO'
+      if (hasAudio === false) {
+        const mute = document.createElement('span')
+        mute.textContent = ' 🔇'; mute.title = 'No audio'
+        badge.appendChild(mute)
+      }
       div.appendChild(badge)
     } else {
       const img = document.createElement('img')
@@ -1339,7 +1345,7 @@
       if (videos.length) appendSection('Videos', getSortedFiles(videos), maker)
     } else {
       for (const f of getSortedFiles(allFiles)) {
-        grid.appendChild(maker(f.name, f.size, metaData[f.name]?.displayName, f.date))
+        grid.appendChild(maker(f.name, f.size, metaData[f.name]?.displayName, f.date, f.hasAudio))
       }
     }
   }
@@ -1350,11 +1356,11 @@
     hdr.textContent = `${label} (${files.length})`
     grid.appendChild(hdr)
     for (const f of files) {
-      grid.appendChild(maker(f.name, f.size, metaData[f.name]?.displayName, f.date))
+      grid.appendChild(maker(f.name, f.size, metaData[f.name]?.displayName, f.date, f.hasAudio))
     }
   }
 
-  function makeListRow(name, size, displayName, date) {
+  function makeListRow(name, size, displayName, date, hasAudio) {
     const isVid = VIDEO_RE.test(name)
     const row = document.createElement('div')
     row.className = 'list-row' + (selectedSet.has(name) ? ' selected' : '')
@@ -1395,6 +1401,11 @@
     const typeEl = document.createElement('span')
     typeEl.className = 'lr-type'
     typeEl.textContent = isVid ? 'video' : 'image'
+    if (isVid && hasAudio === false) {
+      const mute = document.createElement('span')
+      mute.textContent = ' 🔇'; mute.title = 'No audio'
+      typeEl.appendChild(mute)
+    }
 
     const dateEl = document.createElement('span')
     dateEl.className = 'lr-date'
