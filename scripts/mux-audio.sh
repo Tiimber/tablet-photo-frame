@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 # Mux audio from local source MOVs into existing server mp4s (video stream copied, no re-encode).
-# Usage: bash scripts/mux-audio.sh
+# Usage: zsh scripts/mux-audio.sh
 # Requires: ffmpeg, ssh key auth to root@192.168.68.50
 
 set -euo pipefail
@@ -16,7 +16,7 @@ echo "Temp dir: $TMP_DIR"
 echo
 
 # Get list of server mp4s
-mapfile -t SERVER_FILES < <(ssh "$REMOTE_HOST" "ls $REMOTE_DIR/*.mp4 2>/dev/null")
+SERVER_FILES=("${(@f)$(ssh "$REMOTE_HOST" "ls $REMOTE_DIR/*.mp4 2>/dev/null")}")
 
 MUXED=0
 SKIPPED=0
@@ -25,8 +25,9 @@ NO_SOURCE=0
 for remote_path in "${SERVER_FILES[@]}"; do
   server_name="$(basename "$remote_path")"          # e.g. IMG_1718.mp4
   stem="${server_name%.mp4}"                         # e.g. IMG_1718
-  # Normalize _2 suffix back to " 2" for local lookup
-  local_stem="${stem/_2/ 2}"
+  # Normalize trailing _2 suffix back to " 2" for local lookup
+  local_stem="${stem%_2}"
+  [[ "$local_stem" != "$stem" ]] && local_stem="${local_stem} 2"
 
   # Find matching local file (case-insensitive extension)
   local_src=""
