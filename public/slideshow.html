@@ -1325,7 +1325,7 @@
 
   // ── Rendering ─────────────────────────────────────────────────────────────
 
-  function buildMediaItem(fn, info, withSound) {
+  function buildMediaItem(fn, info, withSound, fromStart = false) {
     const item = document.createElement('div')
     item.className = 'media-item'
     if (info.isVideo) {
@@ -1346,7 +1346,7 @@
 
       const startVideo = () => {
         const safeWindow = Math.max(0, info.duration - 2)
-        v.currentTime = safeWindow > 1 ? Math.random() * safeWindow : 0
+        v.currentTime = fromStart ? 0 : (safeWindow > 1 ? Math.random() * safeWindow : 0)
         v.play().then(() => {
           // Unmute after playback starts — avoids autoplay block
           if (withSound) { v.muted = false; v.volume = 1 }
@@ -1838,7 +1838,7 @@
 
     incoming.innerHTML = ''
     incoming.className = 'slide' + (isStack ? ' stacked' : '') + (soloContain ? ' show-now' : '')
-    group.forEach((fn, i) => incoming.appendChild(buildMediaItem(fn, infos[i], showNowWithSound && i === 0)))
+    group.forEach((fn, i) => incoming.appendChild(buildMediaItem(fn, infos[i], showNowWithSound && i === 0, soloContain)))
 
     if (config.kenBurns) {
       const speedMult = config.kenBurnsSpeed === 'slowest' ? 3 : config.kenBurnsSpeed === 'slow' ? 2 : 1
