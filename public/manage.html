@@ -912,7 +912,7 @@
   <div id="lb-slideshow-btns">
     <button id="lb-show-slideshow" title="Show this image on the slideshow">▶ Show on Slideshow</button>
     <button id="lb-play-slideshow" title="Play this video on the slideshow (muted)">▶ Play on Slideshow</button>
-    <button id="lb-play-slideshow-sound" title="Play this video on the slideshow with sound">🔊 Play with Sound on Slideshow</button>
+    <button id="lb-play-slideshow-sound" title="Play this video on the slideshow with sound"><i class="mdi mdi-volume-high"></i> Play with Sound on Slideshow</button>
   </div>
   <div id="lb-trim">
     <div id="lb-trim-timeline">
@@ -1259,16 +1259,15 @@
     cb.addEventListener('change', e => { e.stopPropagation(); toggleSelect(name, div, cb) })
 
     if (isVid) {
-      const v = document.createElement('video')
-      v.src = '/photos/' + encodeURIComponent(name)
-      v.preload = 'metadata'; v.muted = true; v.playsInline = true
-      // Seek to first frame so the browser paints a thumbnail immediately
-      v.addEventListener('loadedmetadata', () => {
-        v.currentTime = 0.001
-        const r = v.videoWidth / (v.videoHeight || 1)
+      const thumbName = name.replace(/\.[^.]+$/, '') + '_thumb.jpg'
+      const img = document.createElement('img')
+      img.src = '/thumbs/' + encodeURIComponent(thumbName)
+      img.loading = 'lazy'; img.alt = name
+      img.addEventListener('load', () => {
+        const r = img.naturalWidth / (img.naturalHeight || 1)
         orientBadge.classList.add(r < 0.9 ? 'portrait' : r > 1.1 ? 'landscape' : 'square')
       })
-      div.appendChild(v)
+      div.appendChild(img)
       const badge = document.createElement('div')
       badge.className = 'video-badge'
       badge.textContent = '▶ VIDEO'
@@ -1431,23 +1430,19 @@
     cb.type = 'checkbox'; cb.className = 'lr-cb'; cb.checked = selectedSet.has(name)
     cb.addEventListener('change', e => { e.stopPropagation(); toggleSelect(name, row, cb) })
 
-    const thumbEl = isVid ? document.createElement('video') : document.createElement('img')
+    const thumbEl = document.createElement('img')
     thumbEl.className = 'lr-thumb'
-    thumbEl.src = '/photos/' + encodeURIComponent(name)
-    if (isVid) { thumbEl.muted = true; thumbEl.preload = 'metadata'; thumbEl.playsInline = true
-      thumbEl.addEventListener('loadedmetadata', () => {
-        thumbEl.currentTime = 0.001
-        const r = thumbEl.videoWidth / (thumbEl.videoHeight || 1)
-        typeEl.textContent = (isVid ? 'video' : 'image') + ' · ' + (r < 0.9 ? 'portrait' : r > 1.1 ? 'landscape' : 'square')
-      })
+    if (isVid) {
+      const thumbName = name.replace(/\.[^.]+$/, '') + '_thumb.jpg'
+      thumbEl.src = '/thumbs/' + encodeURIComponent(thumbName)
+    } else {
+      thumbEl.src = '/photos/' + encodeURIComponent(name)
     }
-    else {
-      thumbEl.loading = 'lazy'; thumbEl.alt = name
-      thumbEl.addEventListener('load', () => {
-        const r = thumbEl.naturalWidth / (thumbEl.naturalHeight || 1)
-        typeEl.textContent = (isVid ? 'video' : 'image') + ' · ' + (r < 0.9 ? 'portrait' : r > 1.1 ? 'landscape' : 'square')
-      })
-    }
+    thumbEl.loading = 'lazy'; thumbEl.alt = name
+    thumbEl.addEventListener('load', () => {
+      const r = thumbEl.naturalWidth / (thumbEl.naturalHeight || 1)
+      typeEl.textContent = (isVid ? 'video' : 'image') + ' · ' + (r < 0.9 ? 'portrait' : r > 1.1 ? 'landscape' : 'square')
+    })
 
     const namesCol = document.createElement('div')
     namesCol.className = 'lr-names'
