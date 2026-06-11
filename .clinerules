@@ -31,6 +31,7 @@
   `ssh root@192.168.68.50 'TOKEN=$(python3 -c "import json; print(json.load(open(\"/opt/slideshow/ha_sync.json\"))[\"token\"])") && curl -s -X POST http://192.168.68.140:8123/api/services/homeassistant/reload_all -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"'`
 
 ## Code Editing Rules
+- When changing any files, push them and the prod server pulls to be up to date.
 - Target Files: slideshow.html and manage.html are over 1,500 lines. The apply_diff tool will fail on massive rewrites.
 - Strict Rule: Never request huge block rewrites. Search for specific local text strings first, then output edits in tiny, targeted diff blocks.
 - Style: Keep code comments minimal and chat responses brief to minimize token costs.
