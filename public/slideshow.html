@@ -1303,6 +1303,8 @@
   // ── Group selection ───────────────────────────────────────────────────────
 
   let prevQueuePos = 0   // queuePos before the last getNextGroup call
+  let transitioning = false  // mutex: only one showGroup at a time
+  let advanceGen = 0         // incremented by showNow to abort in-flight advance()
 
   async function getNextGroup() {
     if (!photos.length) return []
@@ -1321,12 +1323,13 @@
 
   // ── Rendering ─────────────────────────────────────────────────────────────
 
-  function buildMediaItem(fn, info) {
+  function buildMediaItem(fn, info, withSound) {
     const item = document.createElement('div')
     item.className = 'media-item'
     if (info.isVideo) {
       const v = document.createElement('video')
-      v.muted = true; v.playsInline = true; v.loop = true
+      v.muted = !withSound; v.playsInline = true; v.loop = true
+      if (withSound) v.volume = 1
       if (info.h > info.w) v.classList.add('portrait')
       v.src = '/photos/' + encodeURIComponent(fn)
 
@@ -1813,6 +1816,7 @@
 
   async function showGroup(group) {
     if (!group.length) return
+    transitioning = true
     const infos = await Promise.all(group.map(getInfo))
     const isDual  = group.length > 1
     const isStack = isDual && !screenLandscape()
@@ -1828,7 +1832,7 @@
 
     incoming.innerHTML = ''
     incoming.className = 'slide' + (isStack ? ' stacked' : '')
-    group.forEach((fn, i) => incoming.appendChild(buildMediaItem(fn, infos[i])))
+    group.forEach((fn, i) => incoming.appendChild(buildMediaItem(fn, infos[i], showNowWithSound && i === 0)))
 
     if (config.kenBurns) {
       const speedMult = config.kenBurnsSpeed === 'slowest' ? 3 : config.kenBurnsSpeed === 'slow' ? 2 : 1
@@ -1839,10 +1843,16 @@
       })
     }
 
+    // Wait for incoming media to be ready before starting transition.
+    // This prevents the "press twice" issue where the first press shows a blank
+    // frame because the image hasn't loaded yet.
+    await waitForSlideMedia(incoming)
+
     await doTransition(incoming, outgoing)
 
     document.getElementById('counter').textContent = (displayedIndex + 1) + ' / ' + photos.length
     if (photos.length > 0) getInfo(photos[queuePos % photos.length])
+    transitioning = false
   }
 
   function cleanupSlot(slot) {
@@ -1854,7 +1864,11 @@
   // ── Timer & public API ────────────────────────────────────────────────────
 
   async function advance() {
+    if (transitioning) return
+    const gen = advanceGen
     const group = await getNextGroup()
+    // If showNow fired while we were awaiting getNextGroup, abort this advance
+    if (gen !== advanceGen || transitioning) return
     if (group.length) await showGroup(group)
   }
 
@@ -3297,27 +3311,34 @@
     connectWebSocket()
   }
 
-  async function showNow(filename) {
+  let showNowWithSound = false
+
+  async function showNow(filename, withSound) {
     if (timer) clearInterval(timer)
     timer = null
     isPaused = true
+    // Invalidate any in-flight advance() calls and clear transition lock
+    advanceGen++
+    transitioning = false
+    showNowWithSound = !!withSound
     const panel = document.getElementById('settings-panel')
     if (panel) panel.classList.add('paused')
 
-    const idx = photos.indexOf(filename)
-    if (idx !== -1) {
-      queuePos = idx
-    } else {
+    // Ensure the file is in the photos list
+    if (!photos.includes(filename)) {
       await window.reloadPhotos()
-      const idx2 = photos.indexOf(filename)
-      if (idx2 !== -1) {
-        queuePos = idx2
-      } else {
-        photos.push(filename)
-        queuePos = photos.length - 1
-      }
+      if (!photos.includes(filename)) photos.push(filename)
     }
-    await advance()
+
+    // Always show exactly this one file — bypass dual-image grouping logic
+    prevQueuePos = queuePos
+    displayedIndex = photos.indexOf(filename)
+    try {
+      await showGroup([filename])
+    } finally {
+      showNowWithSound = false
+      transitioning = false
+    }
   }
 
   function resumeSlideshow() {
@@ -3425,7 +3446,7 @@
       try { msg = JSON.parse(event.data) } catch { return }
 
       if (msg.type === 'show-now' && msg.filename) {
-        await showNow(msg.filename)
+        await showNow(msg.filename, msg.withSound)
       } else if (msg.type === 'resume-slideshow') {
         resumeSlideshow()
       } else if (msg.type === 'config' && msg.config) {

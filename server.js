@@ -471,10 +471,10 @@ app.post('/api/ha-sync', express.json(), (req, res) => {
 // Show-now endpoint — allows remote control of slideshow via WebSocket broadcast
 // HTTP endpoints kept for backwards compatibility
 app.post('/api/show-now', express.json(), (req, res) => {
-  const { filename } = req.body || {}
+  const { filename, withSound } = req.body || {}
   if (!filename) return res.status(400).json({ error: 'filename required' })
-  console.log('[show-now] broadcast:', filename)
-  broadcast({ type: 'show-now', filename })
+  console.log('[show-now] broadcast:', filename, withSound ? '(with sound)' : '')
+  broadcast({ type: 'show-now', filename, withSound: !!withSound })
   res.json({ ok: true })
 })
 
