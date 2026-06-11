@@ -70,6 +70,8 @@
   body.fit-contain .media-item img,
   body.fit-contain .media-item video { object-fit: contain; }
   .media-item video.portrait { object-fit: contain; }
+  .slide.show-now .media-item img,
+  .slide.show-now .media-item video { object-fit: contain; }
 
   @keyframes kb1 { from { transform: scale(1.0) translate(0,0); }    to { transform: scale(1.15) translate(-2%,-2%); } }
   @keyframes kb2 { from { transform: scale(1.1) translate(-1%,1%); } to { transform: scale(1.0)  translate(2%,-1%); } }
@@ -1814,7 +1816,7 @@
     }
   }
 
-  async function showGroup(group) {
+  async function showGroup(group, soloContain = false) {
     if (!group.length) return
     transitioning = true
     const infos = await Promise.all(group.map(getInfo))
@@ -1831,7 +1833,7 @@
     useA = !useA
 
     incoming.innerHTML = ''
-    incoming.className = 'slide' + (isStack ? ' stacked' : '')
+    incoming.className = 'slide' + (isStack ? ' stacked' : '') + (soloContain ? ' show-now' : '')
     group.forEach((fn, i) => incoming.appendChild(buildMediaItem(fn, infos[i], showNowWithSound && i === 0)))
 
     if (config.kenBurns) {
@@ -3334,7 +3336,7 @@
     prevQueuePos = queuePos
     displayedIndex = photos.indexOf(filename)
     try {
-      await showGroup([filename])
+      await showGroup([filename], true)
     } finally {
       showNowWithSound = false
       transitioning = false
