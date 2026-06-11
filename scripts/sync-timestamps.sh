@@ -55,7 +55,30 @@ for remote_path in "${SERVER_FILES[@]}"; do
     "$local_src" 2>/dev/null | awk -F',' 'NF{print $1; exit}' || true)
 
   if [[ -z "$ts" ]]; then
-    echo "  [NO TS]     $stem — no timestamp in local file"
+    # Fallback: use file birth time (macOS stat -f "%SB" gives birth date in local time)
+    birth_raw=$(stat -f "%SB" -t "%Y-%m-%dT%H:%M:%S" "$local_src" 2>/dev/null || true)
+    if [[ -n "$birth_raw" ]]; then
+      # Convert local time to UTC using python3
+      ts=$(python3 -c "
+from datetime import datetime
+import time, sys
+s = '$birth_raw'
+try:
+    dt = datetime.strptime(s, '%Y-%m-%dT%H:%M:%S')
+    # mktime treats naive datetime as local time; convert to UTC
+    utc_ts = time.mktime(dt.timetuple())
+    from datetime import timezone
+    utc_dt = datetime.fromtimestamp(utc_ts, tz=timezone.utc)
+    print(utc_dt.strftime('%Y-%m-%dT%H:%M:%SZ'))
+except Exception as e:
+    sys.exit(1)
+" 2>/dev/null || true)
+      [[ -n "$ts" ]] && echo "  [FILE DATE] $stem — using file birth date: $ts"
+    fi
+  fi
+
+  if [[ -z "$ts" ]]; then
+    echo "  [NO TS]     $stem — no timestamp found, skipping"
     (( NO_TS++ )) || true
     continue
   fi
