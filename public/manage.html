@@ -1123,7 +1123,10 @@
       const batch = batches[b]
       const batchBytes = batch.reduce((s, f) => s + f.size, 0)
       const form = new FormData()
-      for (const f of batch) form.append('photos', f)
+      for (const f of batch) {
+        form.append('photos', f)
+        form.append('lastModified_' + f.name, String(f.lastModified))
+      }
 
       progressLabel.textContent = batches.length > 1
         ? `Uploading batch ${b + 1} of ${batches.length} (${all.length} files total)…`

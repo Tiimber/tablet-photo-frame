@@ -95,6 +95,9 @@ function broadcast(msg) {
 // queue items: { id, origPath, outName, thumbName, status, error?, progress?, isVideo }
 const queue = []
 
+// lastModified timestamps sent by the browser for uploaded files, keyed by pending file path
+const pendingTimestamps = {}
+
 // Concurrency counters
 let runningTotal = 0
 let runningVideos = 0
@@ -282,7 +285,47 @@ function processQueue() {
         }
       })
       ff.stderr.on('data', d => { errTail = (errTail + d.toString()).slice(-1000) })
-      ff.on('close', (code, signal) => finishQueueItem(next, outPath, code, signal, errTail))
+      ff.on('close', (code, signal) => {
+        // Clean up stored timestamp regardless of outcome
+        const storedMs = pendingTimestamps[next.origPath]
+        delete pendingTimestamps[next.origPath]
+
+        if (code !== 0 || !storedMs) return finishQueueItem(next, outPath, code, signal, errTail)
+
+        // Check whether the transcoded file already has a valid creation_time
+        const probe2 = spawn('ffprobe', [
+          '-v', 'error', '-show_entries', 'format_tags=creation_time',
+          '-of', 'csv=p=0', outPath
+        ])
+        let probeTs = ''
+        probe2.stdout.on('data', d => { probeTs += d.toString() })
+        probe2.on('close', () => {
+          probeTs = probeTs.trim()
+          // Consider timestamp missing/invalid if empty or starts with 1970
+          const needsTs = !probeTs || probeTs.startsWith('1970')
+          if (!needsTs) return finishQueueItem(next, outPath, code, signal, errTail)
+
+          // Inject creation_time from browser lastModified via a fast remux
+          const isoTs = new Date(storedMs).toISOString().replace(/\.\d{3}Z$/, 'Z')
+          const tmpPath = outPath + '.tsTmp.mp4'
+          const inj = spawn('ffmpeg', [
+            '-i', outPath,
+            '-c', 'copy',
+            '-map_metadata', '0',
+            '-metadata', 'creation_time=' + isoTs,
+            '-movflags', '+faststart',
+            '-y', tmpPath
+          ])
+          inj.on('close', injCode => {
+            if (injCode === 0) {
+              try { fs.renameSync(tmpPath, outPath) } catch { try { fs.unlinkSync(tmpPath) } catch {} }
+            } else {
+              try { fs.unlinkSync(tmpPath) } catch {}
+            }
+            finishQueueItem(next, outPath, code, signal, errTail)
+          })
+        })
+      })
     })
   }
 }
@@ -617,6 +660,10 @@ app.post('/upload', upload.array('photos'), (req, res) => {
     const outExt = VIDEO_EXTS.has(inExt) ? '.mp4' : '.jpg'
     const base   = path.basename(sanitizeName(file.originalname), inExt)
     const outName = base + outExt
+    // Store browser-supplied lastModified (ms since epoch) for timestamp fallback
+    const lmKey = 'lastModified_' + file.originalname
+    const lmVal = parseInt(req.body[lmKey], 10)
+    if (!isNaN(lmVal) && lmVal > 0) pendingTimestamps[file.path] = lmVal
     const queueId = enqueueMedia(file.path, outName)
     results.push({ name: file.originalname, queued: true, queueId, outputName: outName })
   }
